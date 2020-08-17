@@ -1,0 +1,12 @@
+[package]
+name = "termchat"
+version = "0.1.0"
+authors = ["lemunozm <lemunozm@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+message-io = "0.3.1"
+crossterm = "0.17"
+tui = { version = "0.10", default-features = false, features = ['crossterm'] }
