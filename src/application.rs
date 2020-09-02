@@ -8,11 +8,14 @@ use tui::backend::CrosstermBackend;
 use tui::widgets::{Widget, Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tui::layout::{Layout, Constraint, Direction, Rect, Alignment};
 use tui::style::{Style, Modifier, Color};
+use tui::text::{Span, Spans};
 
 use message_io::events::{EventQueue};
 use message_io::network::{NetworkManager, NetEvent};
 
 use serde::{Serialize, Deserialize};
+
+use chrono::{DateTime, Local};
 
 use std::net::{SocketAddr};
 use std::io::{self, Stdout};
@@ -33,8 +36,14 @@ enum Event {
     Close,
 }
 
+struct UserMessage {
+   user: String,
+   data: String,
+   date: DateTime<Local>,
+}
+
 struct ApplicationState {
-    messages: Vec<String>,
+    messages: Vec<UserMessage>,
     input: String,
     input_cursor: usize,
 }
@@ -44,10 +53,11 @@ pub struct Application {
     network: NetworkManager,
     terminal: Terminal<CrosstermBackend<Stdout>>,
     _terminal_events: TerminalEventCollector,
+    name: String,
 }
 
 impl Application {
-    pub fn new(discovery_addr: SocketAddr) -> io::Result<Application> {
+    pub fn new(discovery_addr: SocketAddr, name: &str) -> io::Result<Application> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
@@ -68,6 +78,7 @@ impl Application {
             terminal,
             // Stored because we want its internal thread functionality until the Application drop
             _terminal_events,
+            name: name.into(),
         })
     }
 
@@ -125,7 +136,11 @@ impl Application {
                             state.input_cursor = state.input.len();
                         }
                         KeyCode::Enter => {
-                            state.messages.push(state.input.drain(..).collect());
+                            state.messages.push(UserMessage {
+                                user: format!("{} (me)", self.name),
+                                data: state.input.drain(..).collect(),
+                                date: Local::now(),
+                            });
                             state.input_cursor = 0;
                         },
                         _ => (),
@@ -143,7 +158,17 @@ impl Application {
         self.terminal.draw(&mut |frame: &mut Frame<CrosstermBackend<Stdout>>| {
             let messages = state.messages
                 .iter()
-                .map(|message| ListItem::new(message.as_str()))
+                .map(|message| {
+                    let text = vec![
+                        Spans::from(vec![
+                            Span::styled(message.date.format("%H:%M:%S ").to_string(), Style::default().fg(Color::DarkGray)),
+                            Span::styled(&message.user, Style::default().fg(Color::Green)),
+                            Span::styled(": ", Style::default().fg(Color::Green)),
+                            Span::raw(&message.data),
+                        ])
+                    ];
+                    ListItem::new(text)
+                })
                 .collect::<Vec<_>>();
 
             let messages_panel = List::new(messages)
