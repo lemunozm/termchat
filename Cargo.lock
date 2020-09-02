@@ -133,14 +133,15 @@ dependencies = [
 
 [[package]]
 name = "message-io"
-version = "0.3.1"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e540ed5f1769778364322b6b016f2a11712ab694813dfa8d71c6028b74a6c0d"
+checksum = "fed4ea2ed670174752981db0786c368b84e3201be0778b7d44946f1c395f2e3a"
 dependencies = [
  "bincode",
  "crossbeam-channel",
  "log",
  "mio",
+ "net2",
  "serde",
 ]
 
@@ -165,6 +166,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07b88fb9795d4d36d62a012dfbf49a8f5cf12751f36d31a9dbe66d528e58979e"
 dependencies = [
  "socket2",
+ "winapi",
+]
+
+[[package]]
+name = "net2"
+version = "0.2.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2ba7c918ac76704fb42afcbbb43891e72731f3dcca3bef2a19786297baf14af7"
+dependencies = [
+ "cfg-if",
+ "libc",
  "winapi",
 ]
 
@@ -307,6 +319,7 @@ version = "0.1.0"
 dependencies = [
  "crossterm",
  "message-io",
+ "serde",
  "tui",
 ]
 
