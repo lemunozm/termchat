@@ -3,9 +3,9 @@ use super::terminal_events::{TerminalEventCollector};
 use crossterm::{ExecutableCommand, terminal::{self}};
 use crossterm::event::{Event as TermEvent, KeyEvent, KeyCode, KeyModifiers};
 
-use tui::Terminal;
+use tui::{Terminal, Frame};
 use tui::backend::CrosstermBackend;
-use tui::widgets::{Widget, Block, Borders, List, ListItem, ListState, Paragraph};
+use tui::widgets::{Widget, Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
 use tui::layout::{Layout, Constraint, Direction, Rect, Alignment};
 use tui::style::{Style, Modifier, Color};
 
@@ -31,6 +31,12 @@ enum Event {
     Network(NetEvent<InputMessage>),
     Terminal(TermEvent),
     Close,
+}
+
+struct ApplicationState {
+    messages: Vec<String>,
+    input: String,
+    input_cursor: usize,
 }
 
 pub struct Application {
@@ -66,7 +72,13 @@ impl Application {
     }
 
     pub fn run(&mut self) {
-        self.render();
+        let mut state = ApplicationState {
+            messages: Vec::new(),
+            input: String::new(),
+            input_cursor: 0,
+        };
+
+        self.render(&state);
         loop {
             match self.event_queue.receive() {
                 Event::Network(net_event) => match net_event {
@@ -78,11 +90,44 @@ impl Application {
                 },
                 Event::Terminal(term_event) => match term_event {
                     TermEvent::Key(KeyEvent{code, modifiers}) => match code {
-                        KeyCode::Char('c') => {
-                            if modifiers.contains(KeyModifiers::CONTROL) {
+                        KeyCode::Esc => {
+                            self.event_queue.sender().send_with_priority(Event::Close);
+                        },
+                        KeyCode::Char(c) => {
+                            if c == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                                 self.event_queue.sender().send_with_priority(Event::Close);
                             }
+                            else {
+                                state.input.insert(state.input_cursor, c);
+                                state.input_cursor += 1;
+                            }
+                        },
+                        KeyCode::Backspace => {
+                            if state.input_cursor > 0 {
+                                state.input_cursor -= 1;
+                                state.input.remove(state.input_cursor);
+                            }
+                        },
+                        KeyCode::Left => {
+                            if state.input_cursor > 0 {
+                                state.input_cursor -= 1;
+                            }
                         }
+                        KeyCode::Right => {
+                            if state.input_cursor < state.input.len() {
+                                state.input_cursor += 1;
+                            }
+                        }
+                        KeyCode::Home => {
+                            state.input_cursor = 0;
+                        }
+                        KeyCode::End => {
+                            state.input_cursor = state.input.len();
+                        }
+                        KeyCode::Enter => {
+                            state.messages.push(state.input.drain(..).collect());
+                            state.input_cursor = 0;
+                        },
                         _ => (),
                     },
                     TermEvent::Mouse(_) => (),
@@ -90,15 +135,29 @@ impl Application {
                 }
                 Event::Close => break,
             }
-            self.render();
+            self.render(&state);
         }
     }
 
-    fn render(&mut self) {
-        self.terminal.draw(|frame| {
+    fn render(&mut self, state: &ApplicationState) {
+        self.terminal.draw(&mut |frame: &mut Frame<CrosstermBackend<Stdout>>| {
+            let messages = state.messages
+                .iter()
+                .map(|message| ListItem::new(message.as_str()))
+                .collect::<Vec<_>>();
+
+            let messages_panel = List::new(messages)
+                .block(Block::default().title("LAN Room").borders(Borders::ALL))
+                .style(Style::default().fg(Color::White));
+
+            let input_panel = Paragraph::new(state.input.as_str())
+                .block(Block::default().title("Your message").borders(Borders::ALL))
+                .style(Style::default().fg(Color::White))
+                .alignment(Alignment::Left)
+                .wrap(Wrap { trim: true });
+
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .margin(1)
                 .constraints(
                     [
                         Constraint::Min(0),
@@ -107,24 +166,15 @@ impl Application {
                 )
                 .split(frame.size());
 
-            let items = vec![
-                ListItem::new("Item 1"),
-                ListItem::new("Item 2"),
-                ListItem::new("Item 3")
-            ];
+            frame.render_widget(messages_panel, chunks[0]);
+            frame.render_widget(input_panel, chunks[1]);
 
-            let conversation_panel = List::new(items)
-                .block(Block::default().title("LAN Room").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White));
+            let valid_panel_width = (chunks[1].width - 2) as usize;
+            frame.set_cursor(
+                chunks[1].x + 1 + (state.input_cursor % valid_panel_width) as u16,
+                chunks[1].y + 1 + (state.input_cursor / valid_panel_width) as u16,
+            )
 
-            frame.render_widget(conversation_panel, chunks[0]);
-
-            let writing_panel = Paragraph::new("This is an example text")
-                .block(Block::default().title("Your message").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White))
-                .alignment(Alignment::Left);
-
-            frame.render_widget(writing_panel, chunks[1]);
         }).unwrap()
     }
 }
