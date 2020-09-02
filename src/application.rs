@@ -1,4 +1,5 @@
 use super::terminal_events::{TerminalEventCollector};
+use super::util::{SplitEach};
 
 use crossterm::{ExecutableCommand, terminal::{self}};
 use crossterm::event::{Event as TermEvent, KeyEvent, KeyCode, KeyModifiers};
@@ -156,31 +157,6 @@ impl Application {
 
     fn render(&mut self, state: &ApplicationState) {
         self.terminal.draw(&mut |frame: &mut Frame<CrosstermBackend<Stdout>>| {
-            let messages = state.messages
-                .iter()
-                .map(|message| {
-                    let text = vec![
-                        Spans::from(vec![
-                            Span::styled(message.date.format("%H:%M:%S ").to_string(), Style::default().fg(Color::DarkGray)),
-                            Span::styled(&message.user, Style::default().fg(Color::Green)),
-                            Span::styled(": ", Style::default().fg(Color::Green)),
-                            Span::raw(&message.data),
-                        ])
-                    ];
-                    ListItem::new(text)
-                })
-                .collect::<Vec<_>>();
-
-            let messages_panel = List::new(messages)
-                .block(Block::default().title("LAN Room").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White));
-
-            let input_panel = Paragraph::new(state.input.as_str())
-                .block(Block::default().title("Your message").borders(Borders::ALL))
-                .style(Style::default().fg(Color::White))
-                .alignment(Alignment::Left)
-                .wrap(Wrap { trim: true });
-
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(
@@ -191,10 +167,56 @@ impl Application {
                 )
                 .split(frame.size());
 
+            let messages = state.messages
+                .iter()
+                .map(|message| {
+                    let date = message.date.format("%H:%M:%S ").to_string();
+                    Spans::from(vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(Color::Green)),
+                        Span::styled(": ", Style::default().fg(Color::Green)),
+                        Span::raw(&message.data),
+                    ])
+                })
+                .collect::<Vec<_>>();
+
+            let messages_panel = Paragraph::new(messages)
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(Span::styled(
+                        "LAN Room",
+                        Style::default().add_modifier(Modifier::BOLD)
+                    )))
+                .style(Style::default().fg(Color::White))
+                .alignment(Alignment::Left)
+                .wrap(Wrap { trim: false });
+
+
+            let valid_panel_width = (chunks[1].width - 2) as usize;
+
+            let input = state.input
+                .split_each(valid_panel_width)
+                .iter()
+                .map(|line| {
+                    Spans::from(vec![
+                        Span::raw(*line),
+                    ])
+                })
+                .collect::<Vec<_>>();
+
+            let input_panel = Paragraph::new(input)
+                .block(Block::default()
+                    .borders(Borders::ALL)
+                    .title(Span::styled(
+                        "Your message",
+                        Style::default().add_modifier(Modifier::BOLD)
+                    )))
+                .style(Style::default().fg(Color::White))
+                .alignment(Alignment::Left);
+
             frame.render_widget(messages_panel, chunks[0]);
             frame.render_widget(input_panel, chunks[1]);
 
-            let valid_panel_width = (chunks[1].width - 2) as usize;
             frame.set_cursor(
                 chunks[1].x + 1 + (state.input_cursor % valid_panel_width) as u16,
                 chunks[1].y + 1 + (state.input_cursor / valid_panel_width) as u16,

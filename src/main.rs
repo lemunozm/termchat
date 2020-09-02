@@ -1,5 +1,6 @@
 mod application;
 mod terminal_events;
+mod util;
 
 use application::{Application};
 
