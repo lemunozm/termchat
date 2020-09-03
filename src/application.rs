@@ -1,5 +1,5 @@
 use super::terminal_events::{TerminalEventCollector};
-use super::state::{ApplicationState, UserMessage};
+use super::state::{ApplicationState, UserMessage, CursorMovement, ScrollMovement};
 use super::ui::{self};
 
 use crossterm::{ExecutableCommand, terminal::{self}};
@@ -85,60 +85,49 @@ impl Application {
                         KeyCode::Esc => {
                             self.event_queue.sender().send_with_priority(Event::Close);
                         },
-                        KeyCode::Char(c) => {
-                            if c == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
+                        KeyCode::Char(character) => {
+                            if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                                 self.event_queue.sender().send_with_priority(Event::Close);
                             }
                             else {
-                                state.input.insert(state.input_cursor, c);
-                                state.input_cursor += 1;
+                                state.input_write(character);
                             }
+                        },
+                        KeyCode::Delete => {
+                            state.input_remove();
                         },
                         KeyCode::Backspace => {
-                            if state.input_cursor > 0 {
-                                state.input_cursor -= 1;
-                                state.input.remove(state.input_cursor);
-                            }
+                            state.input_remove_previous();
                         },
                         KeyCode::Left => {
-                            if state.input_cursor > 0 {
-                                state.input_cursor -= 1;
-                            }
+                            state.input_move_cursor(CursorMovement::Left);
                         }
                         KeyCode::Right => {
-                            if state.input_cursor < state.input.len() {
-                                state.input_cursor += 1;
-                            }
+                            state.input_move_cursor(CursorMovement::Right);
                         }
                         KeyCode::Home => {
-                            state.input_cursor = 0;
+                            state.input_move_cursor(CursorMovement::Start);
                         }
                         KeyCode::End => {
-                            state.input_cursor = state.input.len();
+                            state.input_move_cursor(CursorMovement::End);
                         }
                         KeyCode::Enter => {
-                            if state.input.len() > 0 {
-                                state.messages.push(UserMessage {
-                                    user: format!("{} (me)", self.name),
-                                    data: state.input.drain(..).collect(),
+                            if let Some(message) = state.reset_input() {
+                                state.add_message(UserMessage {
                                     date: Local::now(),
+                                    user: format!("{} (me)", self.name),
+                                    msg: message,
                                 });
-                                state.input_cursor = 0;
                             }
                         },
                         KeyCode::Up => {
-                            if state.scroll_messages_view > 0 {
-                                state.scroll_messages_view -= 1;
-                            }
+                            state.messages_scroll(ScrollMovement::Up);
                         },
                         KeyCode::Down => {
-                            state.scroll_messages_view += 1;
+                            state.messages_scroll(ScrollMovement::Down);
                         }
                         KeyCode::PageUp => {
-                            state.scroll_messages_view = 0;
-                        }
-                        KeyCode::PageDown => {
-                            //TODO: when tui-rs support a kind of 'max-scrolling' for paragraph
+                            state.messages_scroll(ScrollMovement::Start);
                         }
                         _ => (),
                     },

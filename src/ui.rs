@@ -29,7 +29,8 @@ pub fn draw(terminal: &mut Terminal<CrosstermBackend<Stdout>>, state: &Applicati
 }
 
 fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
-    let messages = state.messages
+    let messages = state
+        .messages()
         .iter()
         .rev()
         .map(|message| {
@@ -38,7 +39,7 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
                 Span::styled(date, Style::default().fg(Color::DarkGray)),
                 Span::styled(&message.user, Style::default().fg(Color::Green)),
                 Span::styled(": ", Style::default().fg(Color::Green)),
-                Span::raw(&message.data),
+                Span::raw(&message.msg),
             ])
         })
         .collect::<Vec<_>>();
@@ -52,7 +53,7 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
             )))
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left)
-        .scroll((state.scroll_messages_view as u16, 0))
+        .scroll((state.scroll_messages_view() as u16, 0))
         .wrap(Wrap { trim: false });
 
     frame.render_widget(messages_panel, chunk);
@@ -61,7 +62,8 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
 fn draw_input_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
     let inner_width = (chunk.width - 2) as usize;
 
-    let input = state.input
+    let input = state
+        .input()
         .split_each(inner_width)
         .iter()
         .map(|line| {
@@ -84,7 +86,7 @@ fn draw_input_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Applica
     frame.render_widget(input_panel, chunk);
 
     frame.set_cursor(
-        chunk.x + 1 + (state.input_cursor % inner_width) as u16,
-        chunk.y + 1 + (state.input_cursor / inner_width) as u16,
+        chunk.x + 1 + (state.input_cursor() % inner_width) as u16,
+        chunk.y + 1 + (state.input_cursor() / inner_width) as u16,
     )
 }
