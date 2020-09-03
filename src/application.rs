@@ -6,7 +6,7 @@ use crossterm::event::{Event as TermEvent, KeyEvent, KeyCode, KeyModifiers};
 
 use tui::{Terminal, Frame};
 use tui::backend::CrosstermBackend;
-use tui::widgets::{Widget, Block, Borders, List, ListItem, ListState, Paragraph, Wrap};
+use tui::widgets::{Block, Borders, Paragraph, Wrap};
 use tui::layout::{Layout, Constraint, Direction, Rect, Alignment};
 use tui::style::{Style, Modifier, Color};
 use tui::text::{Span, Spans};
@@ -45,6 +45,7 @@ struct UserMessage {
 
 struct ApplicationState {
     messages: Vec<UserMessage>,
+    scroll_messages_view: usize,
     input: String,
     input_cursor: usize,
 }
@@ -77,7 +78,7 @@ impl Application {
             event_queue,
             network,
             terminal,
-            // Stored because we want its internal thread functionality until the Application drop
+            // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
             name: name.into(),
         })
@@ -86,11 +87,12 @@ impl Application {
     pub fn run(&mut self) {
         let mut state = ApplicationState {
             messages: Vec::new(),
+            scroll_messages_view: 0,
             input: String::new(),
             input_cursor: 0,
         };
 
-        self.render(&state);
+        self.draw(&state);
         loop {
             match self.event_queue.receive() {
                 Event::Network(net_event) => match net_event {
@@ -137,13 +139,29 @@ impl Application {
                             state.input_cursor = state.input.len();
                         }
                         KeyCode::Enter => {
-                            state.messages.push(UserMessage {
-                                user: format!("{} (me)", self.name),
-                                data: state.input.drain(..).collect(),
-                                date: Local::now(),
-                            });
-                            state.input_cursor = 0;
+                            if state.input.len() > 0 {
+                                state.messages.push(UserMessage {
+                                    user: format!("{} (me)", self.name),
+                                    data: state.input.drain(..).collect(),
+                                    date: Local::now(),
+                                });
+                                state.input_cursor = 0;
+                            }
                         },
+                        KeyCode::Up => {
+                            if state.scroll_messages_view > 0 {
+                                state.scroll_messages_view -= 1;
+                            }
+                        },
+                        KeyCode::Down => {
+                            state.scroll_messages_view += 1;
+                        }
+                        KeyCode::PageUp => {
+                            state.scroll_messages_view = 0;
+                        }
+                        KeyCode::PageDown => {
+                            //TODO: when tui-rs support a kind of 'max-scrolling' for paragraph
+                        }
                         _ => (),
                     },
                     TermEvent::Mouse(_) => (),
@@ -151,12 +169,12 @@ impl Application {
                 }
                 Event::Close => break,
             }
-            self.render(&state);
+            self.draw(&state);
         }
     }
 
-    fn render(&mut self, state: &ApplicationState) {
-        self.terminal.draw(&mut |frame: &mut Frame<CrosstermBackend<Stdout>>| {
+    fn draw(&mut self, state: &ApplicationState) {
+        self.terminal.draw(|frame| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints(
@@ -167,62 +185,70 @@ impl Application {
                 )
                 .split(frame.size());
 
-            let messages = state.messages
-                .iter()
-                .map(|message| {
-                    let date = message.date.format("%H:%M:%S ").to_string();
-                    Spans::from(vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(Color::Green)),
-                        Span::styled(": ", Style::default().fg(Color::Green)),
-                        Span::raw(&message.data),
-                    ])
-                })
-                .collect::<Vec<_>>();
-
-            let messages_panel = Paragraph::new(messages)
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .title(Span::styled(
-                        "LAN Room",
-                        Style::default().add_modifier(Modifier::BOLD)
-                    )))
-                .style(Style::default().fg(Color::White))
-                .alignment(Alignment::Left)
-                .wrap(Wrap { trim: false });
-
-
-            let valid_panel_width = (chunks[1].width - 2) as usize;
-
-            let input = state.input
-                .split_each(valid_panel_width)
-                .iter()
-                .map(|line| {
-                    Spans::from(vec![
-                        Span::raw(*line),
-                    ])
-                })
-                .collect::<Vec<_>>();
-
-            let input_panel = Paragraph::new(input)
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .title(Span::styled(
-                        "Your message",
-                        Style::default().add_modifier(Modifier::BOLD)
-                    )))
-                .style(Style::default().fg(Color::White))
-                .alignment(Alignment::Left);
-
-            frame.render_widget(messages_panel, chunks[0]);
-            frame.render_widget(input_panel, chunks[1]);
-
-            frame.set_cursor(
-                chunks[1].x + 1 + (state.input_cursor % valid_panel_width) as u16,
-                chunks[1].y + 1 + (state.input_cursor / valid_panel_width) as u16,
-            )
-
+            Self::draw_messages_panel(frame, state, chunks[0]);
+            Self::draw_input_panel(frame, state, chunks[1]);
         }).unwrap()
+    }
+
+    fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
+        let messages = state.messages
+            .iter()
+            .rev()
+            .map(|message| {
+                let date = message.date.format("%H:%M:%S ").to_string();
+                Spans::from(vec![
+                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&message.user, Style::default().fg(Color::Green)),
+                    Span::styled(": ", Style::default().fg(Color::Green)),
+                    Span::raw(&message.data),
+                ])
+            })
+            .collect::<Vec<_>>();
+
+        let messages_panel = Paragraph::new(messages)
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled(
+                    "LAN Room",
+                    Style::default().add_modifier(Modifier::BOLD)
+                )))
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left)
+            .scroll((state.scroll_messages_view as u16, 0))
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(messages_panel, chunk);
+    }
+
+    fn draw_input_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
+        let inner_width = (chunk.width - 2) as usize;
+
+        let input = state.input
+            .split_each(inner_width)
+            .iter()
+            .map(|line| {
+                Spans::from(vec![
+                    Span::raw(*line),
+                ])
+            })
+            .collect::<Vec<_>>();
+
+        let input_panel = Paragraph::new(input)
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled(
+                    "Your message",
+                    Style::default().add_modifier(Modifier::BOLD)
+                )))
+            .style(Style::default().fg(Color::White))
+            .alignment(Alignment::Left);
+
+        frame.render_widget(input_panel, chunk);
+
+        frame.set_cursor(
+            chunk.x + 1 + (state.input_cursor % inner_width) as u16,
+            chunk.y + 1 + (state.input_cursor / inner_width) as u16,
+        )
     }
 }
 
