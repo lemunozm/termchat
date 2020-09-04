@@ -81,16 +81,21 @@ impl ApplicationState {
         self.lan_users.keys()
     }
 
+    pub fn users_id(&self) -> &HashMap<String, usize> {
+        &self.users_id
+    }
+
     pub fn connected_user(&mut self, endpoint: Endpoint, user: &str) {
-        self.last_user_id += 1;
         self.lan_users.insert(endpoint, user.into());
-        self.users_id.insert(user.into(), self.last_user_id);
+        if !self.users_id.contains_key(user) {
+            self.users_id.insert(user.into(), self.last_user_id);
+        }
+        self.last_user_id += 1;
         self.add_message(LogMessage::new(user.into(), MessageType::Connection));
     }
 
     pub fn disconnected_user(&mut self, endpoint: Endpoint) {
         let user = self.lan_users.remove(&endpoint).unwrap();
-        self.users_id.remove(&user);
         self.add_message(LogMessage::new(user, MessageType::Disconnection));
     }
 

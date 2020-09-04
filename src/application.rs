@@ -68,9 +68,10 @@ impl Application {
         ui::draw(&mut self.terminal, &state);
 
         let (_, server_addr) = self.network.listen_tcp("0.0.0.0:0").unwrap();
+        self.network.listen_udp_multicast(self.discovery_addr).unwrap();
+
         let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
         self.network.send(discovery_endpoint, NetMessage::HelloLan(self.user_name.clone(), server_addr)).unwrap();
-        self.network.listen_udp_multicast(self.discovery_addr).unwrap();
 
         loop {
             match self.event_queue.receive() {
@@ -114,7 +115,7 @@ impl Application {
                         },
                         KeyCode::Enter => {
                             if let Some(input) = state.reset_input() {
-                                let message = LogMessage::new(format!("{} (me)", state.all_user_endpoints().count()), MessageType::Content(input.clone()));
+                                let message = LogMessage::new(format!("{} (me)", self.user_name), MessageType::Content(input.clone()));
                                 self.network.send_all(state.all_user_endpoints(), NetMessage::UserMessage(input)).unwrap();
                                 state.add_message(message);
                             }

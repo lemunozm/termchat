@@ -29,32 +29,46 @@ pub fn draw(terminal: &mut Terminal<CrosstermBackend<Stdout>>, state: &Applicati
 }
 
 fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
+    const MESSAGE_COLORS: [Color; 5] = [
+        Color::Blue,
+        Color::Yellow,
+        Color::Red,
+        Color::Cyan,
+        Color::Magenta,
+    ];
+
     let messages = state
         .messages()
         .iter()
         .rev()
         .map(|message| {
+            let color = if let Some(id) = state.users_id().get(&message.user) {
+                MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
+            }
+            else {
+                Color::Green //because is a message of the own user
+            };
             let date = message.date.format("%H:%M:%S ").to_string();
             match &message.message_type {
                 MessageType::Connection => {
                     Spans::from(vec![
                         Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(Color::Green)),
-                        Span::styled("is online", Style::default().fg(Color::Green)),
+                        Span::styled(&message.user, Style::default().fg(color)),
+                        Span::styled(" is online", Style::default().fg(color)),
                     ])
                 }
                 MessageType::Disconnection => {
                     Spans::from(vec![
                         Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(Color::Green)),
-                        Span::styled("is offline", Style::default().fg(Color::Green)),
+                        Span::styled(&message.user, Style::default().fg(color)),
+                        Span::styled(" is offline", Style::default().fg(color)),
                     ])
                 }
                 MessageType::Content(content) => {
                     Spans::from(vec![
                         Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(Color::Green)),
-                        Span::styled(": ", Style::default().fg(Color::Green)),
+                        Span::styled(&message.user, Style::default().fg(color)),
+                        Span::styled(": ", Style::default().fg(color)),
                         Span::raw(content),
                     ])
                 },
