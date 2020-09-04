@@ -1,5 +1,5 @@
 use super::util::{SplitEach};
-use super::state::{ApplicationState};
+use super::state::{ApplicationState, MessageType};
 
 use tui::{Terminal, Frame};
 use tui::backend::{CrosstermBackend};
@@ -35,12 +35,30 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
         .rev()
         .map(|message| {
             let date = message.date.format("%H:%M:%S ").to_string();
-            Spans::from(vec![
-                Span::styled(date, Style::default().fg(Color::DarkGray)),
-                Span::styled(&message.user, Style::default().fg(Color::Green)),
-                Span::styled(": ", Style::default().fg(Color::Green)),
-                Span::raw(&message.msg),
-            ])
+            match &message.message_type {
+                MessageType::Connection => {
+                    Spans::from(vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(Color::Green)),
+                        Span::styled("is online", Style::default().fg(Color::Green)),
+                    ])
+                }
+                MessageType::Disconnection => {
+                    Spans::from(vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(Color::Green)),
+                        Span::styled("is offline", Style::default().fg(Color::Green)),
+                    ])
+                }
+                MessageType::Content(content) => {
+                    Spans::from(vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(Color::Green)),
+                        Span::styled(": ", Style::default().fg(Color::Green)),
+                        Span::raw(content),
+                    ])
+                },
+            }
         })
         .collect::<Vec<_>>();
 

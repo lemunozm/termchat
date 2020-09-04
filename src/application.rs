@@ -1,5 +1,5 @@
 use super::terminal_events::{TerminalEventCollector};
-use super::state::{ApplicationState, UserMessage, CursorMovement, ScrollMovement};
+use super::state::{ApplicationState, LogMessage, MessageType, CursorMovement, ScrollMovement};
 use super::ui::{self};
 
 use crossterm::{ExecutableCommand, terminal::{self}};
@@ -13,23 +13,18 @@ use message_io::network::{NetworkManager, NetEvent};
 
 use serde::{Serialize, Deserialize};
 
-use chrono::{Local};
-
 use std::net::{SocketAddr};
 use std::io::{self, Stdout};
 
-#[derive(Serialize)]
-enum OutputMessage {
-    ParticipantInfo(String),
-}
-
-#[derive(Deserialize)]
-enum InputMessage {
-    HelloLan,
+#[derive(Serialize, Deserialize)]
+enum NetMessage {
+    HelloLan(String, SocketAddr), // user_name, server_addr
+    HelloUser(String), // user_name
+    UserMessage(String), // content
 }
 
 enum Event {
-    Network(NetEvent<InputMessage>),
+    Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     Close,
 }
@@ -39,20 +34,19 @@ pub struct Application {
     network: NetworkManager,
     terminal: Terminal<CrosstermBackend<Stdout>>,
     _terminal_events: TerminalEventCollector,
-    name: String,
+    discovery_addr: SocketAddr,
+    user_name: String,
 }
 
 impl Application {
-    pub fn new(discovery_addr: SocketAddr, name: &str) -> io::Result<Application> {
+    pub fn new(discovery_addr: SocketAddr, user_name: &str) -> io::Result<Application> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let mut network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
+        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| sender.send(Event::Terminal(term_event)));
-
-        network.listen_udp_multicast(discovery_addr).unwrap();
 
         terminal::enable_raw_mode().unwrap();
         io::stdout().execute(terminal::EnterAlternateScreen).unwrap();
@@ -64,21 +58,46 @@ impl Application {
             terminal,
             // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
-            name: name.into(),
+            discovery_addr,
+            user_name: user_name.into(),
         })
     }
 
     pub fn run(&mut self) {
         let mut state = ApplicationState::new();
         ui::draw(&mut self.terminal, &state);
+
+        let (_, server_addr) = self.network.listen_tcp("0.0.0.0:0").unwrap();
+        let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
+        self.network.send(discovery_endpoint, NetMessage::HelloLan(self.user_name.clone(), server_addr)).unwrap();
+        self.network.listen_udp_multicast(self.discovery_addr).unwrap();
+
         loop {
             match self.event_queue.receive() {
                 Event::Network(net_event) => match net_event {
-                    NetEvent::Message(_, message) => match message {
-                        InputMessage::HelloLan => { },
+                    NetEvent::Message(endpoint, message) => match message {
+                        // by udp (multicast):
+                        NetMessage::HelloLan(user, server_addr) => {
+                            if user != self.user_name {
+                                let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
+                                self.network.send(user_endpoint, NetMessage::HelloUser(self.user_name.clone())).unwrap();
+                                state.connected_user(user_endpoint, &user);
+                            }
+                        },
+                        // by tcp:
+                        NetMessage::HelloUser(user) => {
+                            state.connected_user(endpoint, &user);
+                        }
+                        NetMessage::UserMessage(content) => {
+                            let user = state.user_name(endpoint).unwrap();
+                            let message = LogMessage::new(user.into(), MessageType::Content(content));
+                            state.add_message(message);
+                        }
                     },
                     NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(_) => (),
+                    NetEvent::RemovedEndpoint(endpoint) => {
+                        state.disconnected_user(endpoint);
+                    },
                 },
                 Event::Terminal(term_event) => match term_event {
                     TermEvent::Key(KeyEvent{code, modifiers}) => match code {
@@ -91,6 +110,13 @@ impl Application {
                             }
                             else {
                                 state.input_write(character);
+                            }
+                        },
+                        KeyCode::Enter => {
+                            if let Some(input) = state.reset_input() {
+                                let message = LogMessage::new(format!("{} (me)", state.all_user_endpoints().count()), MessageType::Content(input.clone()));
+                                self.network.send_all(state.all_user_endpoints(), NetMessage::UserMessage(input)).unwrap();
+                                state.add_message(message);
                             }
                         },
                         KeyCode::Delete => {
@@ -111,15 +137,6 @@ impl Application {
                         KeyCode::End => {
                             state.input_move_cursor(CursorMovement::End);
                         }
-                        KeyCode::Enter => {
-                            if let Some(message) = state.reset_input() {
-                                state.add_message(UserMessage {
-                                    date: Local::now(),
-                                    user: format!("{} (me)", self.name),
-                                    msg: message,
-                                });
-                            }
-                        },
                         KeyCode::Up => {
                             state.messages_scroll(ScrollMovement::Up);
                         },
