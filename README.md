@@ -22,7 +22,7 @@ If you have `~/.cargo/bin` in your PATH (or similar in your OS), you will be abl
 [cargo]: https://doc.rust-lang.org/cargo/getting-started/installation.html
 
 # How it works?
-To no saturate the network, *Termchat* uses a only a multicast message to found other *termchat* applications in the network once connect by first time.
+To not saturate the network, *termchat* uses a only a multicast message to found other *termchat* applications in the network once connect by first time.
 Once a new application has been found by multicast, a TCP connection is created between them.
 
 ## Usage
