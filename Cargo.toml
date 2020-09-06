@@ -2,6 +2,7 @@
 name = "termchat"
 version = "0.1.0"
 authors = ["lemunozm <lemunozm@gmail.com>"]
+description = "LAN chat in the terminal"
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,3 +14,4 @@ crossterm = "0.17"
 tui = { version = "0.10", default-features = false, features = ['crossterm'] }
 whoami = "0.9"
 chrono = "0.4"
+clap = "2.33"
