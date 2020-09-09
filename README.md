@@ -33,4 +33,5 @@ $ termchat
 
 to open the application in your terminal.
 
-You can rename your user name using the argument `-u <name>`, or modified the multicast discovery address (see the application help `--help`).
+By default, your computer user name is used. 
+You can rename your this name using the argument `-u <name>`, or modified the multicast discovery address (see the application help `--help`).
