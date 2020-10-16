@@ -81,7 +81,7 @@ impl Application {
                     NetEvent::Message(endpoint, message) => match message {
                         // by udp (multicast):
                         NetMessage::HelloLan(user, server_port) => {
-							let server_addr = format!("{}:{}", endpoint.addr().ip(), server_port);
+							let server_addr = (endpoint.addr().ip(), server_port);
                             if user != self.user_name {
                                 let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
                                 self.network.send(user_endpoint, NetMessage::HelloUser(self.user_name.clone())).unwrap();
