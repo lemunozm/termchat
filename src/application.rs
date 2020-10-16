@@ -18,7 +18,7 @@ use std::io::{self, Stdout};
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
-    HelloLan(String, SocketAddr), // user_name, server_addr
+    HelloLan(String, u16), // user_name, server_port
     HelloUser(String), // user_name
     UserMessage(String), // content
 }
@@ -68,17 +68,20 @@ impl Application {
         ui::draw(&mut self.terminal, &state);
 
         let (_, server_addr) = self.network.listen_tcp("0.0.0.0:0").unwrap();
+        let server_port = server_addr.port();
+        
         self.network.listen_udp_multicast(self.discovery_addr).unwrap();
 
         let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
-        self.network.send(discovery_endpoint, NetMessage::HelloLan(self.user_name.clone(), server_addr)).unwrap();
+        self.network.send(discovery_endpoint, NetMessage::HelloLan(self.user_name.clone(), server_port)).unwrap();
 
         loop {
             match self.event_queue.receive() {
                 Event::Network(net_event) => match net_event {
                     NetEvent::Message(endpoint, message) => match message {
                         // by udp (multicast):
-                        NetMessage::HelloLan(user, server_addr) => {
+                        NetMessage::HelloLan(user, server_port) => {
+							let server_addr = format!("{}:{}", endpoint.addr().ip(), server_port);
                             if user != self.user_name {
                                 let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
                                 self.network.send(user_endpoint, NetMessage::HelloUser(self.user_name.clone())).unwrap();
