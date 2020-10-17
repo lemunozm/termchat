@@ -81,12 +81,9 @@ impl Application {
             .unwrap();
 
         let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
-        self.network
-            .send(
-                discovery_endpoint,
-                NetMessage::HelloLan(self.user_name.clone(), server_port),
-            )
-            .unwrap();
+
+        let message = NetMessage::HelloLan(self.user_name.clone(), server_port);
+        self.network.send(discovery_endpoint, message).unwrap();
 
         loop {
             match self.event_queue.receive() {
@@ -97,12 +94,8 @@ impl Application {
                             let server_addr = (endpoint.addr().ip(), server_port);
                             if user != self.user_name {
                                 let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
-                                self.network
-                                    .send(
-                                        user_endpoint,
-                                        NetMessage::HelloUser(self.user_name.clone()),
-                                    )
-                                    .unwrap();
+                                let message = NetMessage::HelloUser(self.user_name.clone());
+                                self.network.send(user_endpoint, message).unwrap();
                                 state.connected_user(user_endpoint, &user);
                             }
                         }
