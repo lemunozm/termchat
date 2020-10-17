@@ -10,7 +10,9 @@ homepage = "https://github.com/lemunozm/termchat/"
 repository = "https://github.com/lemunozm/termchat/"
 keywords = ["network", "chat", "lan", "terminal", "multicast"]
 categories = ["command-line-utilities", "command-line-interface"]
-maintenance = "actively-developed"
+
+[badges]
+maintenance = { status = "actively-developed" }
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
