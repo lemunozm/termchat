@@ -160,7 +160,7 @@ impl ApplicationState {
     }
 
     pub fn reset_input(&mut self) -> Option<String> {
-        if self.input.len() > 0 {
+        if !self.input.is_empty() {
             self.input_cursor = 0;
             return Some(self.input.drain(..).collect());
         }
