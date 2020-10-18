@@ -1,6 +1,7 @@
 use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
+use crate::Result;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -47,20 +48,19 @@ impl Application {
         discovery_addr: SocketAddr,
         tcp_server_port: u16,
         user_name: &str,
-    ) -> io::Result<Application> {
+    ) -> Result<Application> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
         let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
-        let _terminal_events =
-            TerminalEventCollector::new(move |term_event| sender.send(Event::Terminal(term_event)));
+        let _terminal_events = TerminalEventCollector::new(move |term_event| {
+            sender.send(Event::Terminal(term_event))
+        })?;
 
-        terminal::enable_raw_mode().unwrap();
-        io::stdout()
-            .execute(terminal::EnterAlternateScreen)
-            .unwrap();
+        terminal::enable_raw_mode()?;
+        io::stdout().execute(terminal::EnterAlternateScreen)?;
         let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
         let tcp_server_addr = ([0, 0, 0, 0], tcp_server_port).into();
@@ -77,20 +77,19 @@ impl Application {
         })
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<()> {
         let mut state = ApplicationState::new();
-        ui::draw(&mut self.terminal, &state);
+        ui::draw(&mut self.terminal, &state)?;
 
-        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr).unwrap();
+        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr)?;
         let server_port = server_addr.port();
 
-        self.network
-            .listen_udp_multicast(self.discovery_addr)
-            .unwrap();
+        self.network.listen_udp_multicast(self.discovery_addr)?;
 
-        let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
+        let discovery_endpoint = self.network.connect_udp(self.discovery_addr)?;
+
         let message = NetMessage::HelloLan(self.user_name.clone(), server_port);
-        self.network.send(discovery_endpoint, message).unwrap();
+        self.network.send(discovery_endpoint, message)?;
 
         loop {
             match self.event_queue.receive() {
@@ -100,10 +99,20 @@ impl Application {
                         NetMessage::HelloLan(user, server_port) => {
                             let server_addr = (endpoint.addr().ip(), server_port);
                             if user != self.user_name {
-                                let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
-                                let message = NetMessage::HelloUser(self.user_name.clone());
-                                self.network.send(user_endpoint, message).unwrap();
-                                state.connected_user(user_endpoint, &user);
+                                let mut try_connect = || -> Result<()> {
+                                    let user_endpoint = self.network.connect_tcp(server_addr)?;
+                                    let message = NetMessage::HelloUser(self.user_name.clone());
+                                    self.network.send(user_endpoint, message)?;
+                                    state.connected_user(user_endpoint, &user);
+                                    Ok(())
+                                };
+                                if let Err(e) = try_connect() {
+                                    let message = LogMessage::new(
+                                        format!("{} (me)", self.user_name),
+                                        MessageType::Error(e.to_string()),
+                                    );
+                                    state.add_message(message);
+                                }
                             }
                         }
                         // by tcp:
@@ -111,7 +120,9 @@ impl Application {
                             state.connected_user(endpoint, &user);
                         }
                         NetMessage::UserMessage(content) => {
-                            let user = state.user_name(endpoint).unwrap();
+                            let user = "???".to_string();
+                            let user = state.user_name(endpoint).unwrap_or(&user);
+
                             let message =
                                 LogMessage::new(user.into(), MessageType::Content(content));
                             state.add_message(message);
@@ -136,16 +147,21 @@ impl Application {
                         }
                         KeyCode::Enter => {
                             if let Some(input) = state.reset_input() {
-                                let message = LogMessage::new(
+                                let mut message = LogMessage::new(
                                     format!("{} (me)", self.user_name),
                                     MessageType::Content(input.clone()),
                                 );
-                                self.network
-                                    .send_all(
-                                        state.all_user_endpoints(),
-                                        NetMessage::UserMessage(input),
-                                    )
-                                    .unwrap();
+
+                                if let Err(e) = self.network.send_all(
+                                    state.all_user_endpoints(),
+                                    NetMessage::UserMessage(input),
+                                ) {
+                                    message = LogMessage::new(
+                                        format!("{} (me)", self.user_name),
+                                        MessageType::Error(format_errors(e)),
+                                    );
+                                }
+
                                 state.add_message(message);
                             }
                         }
@@ -183,16 +199,35 @@ impl Application {
                 },
                 Event::Close => break,
             }
-            ui::draw(&mut self.terminal, &state);
+            ui::draw(&mut self.terminal, &state)?;
         }
+        Ok(())
     }
 }
 
 impl Drop for Application {
     fn drop(&mut self) {
-        io::stdout()
-            .execute(terminal::LeaveAlternateScreen)
-            .unwrap();
-        terminal::disable_raw_mode().unwrap()
+        clean_terminal();
     }
+}
+
+pub fn clean_terminal() {
+    io::stdout()
+        .execute(terminal::LeaveAlternateScreen)
+        .expect("Could not leave alternate screen");
+    terminal::disable_raw_mode().expect("Could not disable raw mode at exit");
+}
+
+fn format_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
+    let mut out = String::new();
+    for (endpoint, error) in e {
+        let msg = format!("Failed to connect to {}, error: {}", endpoint, error);
+        out.push_str(&msg);
+        out.push('\n');
+    }
+    // remove last new line
+    if !out.is_empty() {
+        out.pop();
+    }
+    out
 }

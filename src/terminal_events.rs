@@ -1,3 +1,4 @@
+use crate::Result;
 use crossterm::event::Event;
 
 use std::sync::{
@@ -15,7 +16,7 @@ pub struct TerminalEventCollector {
 }
 
 impl TerminalEventCollector {
-    pub fn new<C>(event_callback: C) -> TerminalEventCollector
+    pub fn new<C>(event_callback: C) -> Result<TerminalEventCollector>
     where
         C: Fn(Event) + Send + 'static,
     {
@@ -26,20 +27,34 @@ impl TerminalEventCollector {
             thread::Builder::new()
                 .name("termchat: terminal event collector".into())
                 .spawn(move || {
-                    while running.load(Ordering::Relaxed) {
-                        if crossterm::event::poll(timeout).unwrap() {
-                            let event = crossterm::event::read().unwrap();
+                    let try_read = || -> Result<()> {
+                        if crossterm::event::poll(timeout)? {
+                            let event = crossterm::event::read()?;
                             event_callback(event);
+                        }
+                        Ok(())
+                    };
+                    while running.load(Ordering::Relaxed) {
+                        if let Err(e) = try_read() {
+                            crate::application::clean_terminal();
+                            eprintln!("Termchat crashed, could not read input event, error: {}", e);
+
+                            // Hack send to ctrlc to the main thread to exit with clean up
+                            event_callback(crossterm::event::Event::Key(
+                                crossterm::event::KeyEvent {
+                                    code: crossterm::event::KeyCode::Char('c'),
+                                    modifiers: crossterm::event::KeyModifiers::CONTROL,
+                                },
+                            ))
                         }
                     }
                 })
-        }
-        .unwrap();
+        }?;
 
-        TerminalEventCollector {
+        Ok(TerminalEventCollector {
             collector_thread_running,
             collector_thread_handle: Some(collector_thread_handle),
-        }
+        })
     }
 }
 
@@ -47,6 +62,11 @@ impl Drop for TerminalEventCollector {
     fn drop(&mut self) {
         self.collector_thread_running
             .store(false, Ordering::Relaxed);
-        self.collector_thread_handle.take().unwrap().join().unwrap();
+        // the first unwrap is safe, beacuse we now the handle is some and this is the only time we take it
+        self.collector_thread_handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("Error while joining collector thread handle");
     }
 }

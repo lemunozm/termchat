@@ -8,6 +8,8 @@ use application::Application;
 
 use clap::{App, Arg};
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 fn main() {
     let os_username = whoami::username();
 
@@ -38,6 +40,8 @@ fn main() {
         )
         .get_matches();
 
+    // The next unwraps are safe because we specified a default value
+
     let discovery_addr = match matches.value_of("discovery").unwrap().parse() {
         Ok(discovery_addr) => discovery_addr,
         Err(_) => return eprintln!("'discovery' must be a valid multicast address"),
@@ -50,7 +54,16 @@ fn main() {
 
     let name = matches.value_of("username").unwrap();
 
-    if let Ok(mut app) = Application::new(discovery_addr, tcp_server_port, &name) {
-        app.run()
+    match Application::new(discovery_addr, tcp_server_port, &name) {
+        Ok(mut app) => {
+            if let Err(e) = app.run() {
+                application::clean_terminal();
+                eprintln!("Termchat crashed, err: {}", e);
+            }
+        }
+        Err(e) => {
+            application::clean_terminal();
+            eprintln!("Termchat crashed, err: {}", e);
+        }
     }
 }

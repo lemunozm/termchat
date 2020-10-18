@@ -1,5 +1,6 @@
 use super::state::{ApplicationState, MessageType};
 use super::util::SplitEach;
+use crate::Result;
 
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -10,18 +11,19 @@ use tui::{Frame, Terminal};
 
 use std::io::Stdout;
 
-pub fn draw(terminal: &mut Terminal<CrosstermBackend<Stdout>>, state: &ApplicationState) {
-    terminal
-        .draw(|frame| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
-                .split(frame.size());
+pub fn draw(
+    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    state: &ApplicationState,
+) -> Result<()> {
+    Ok(terminal.draw(|frame| {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
+            .split(frame.size());
 
-            draw_messages_panel(frame, state, chunks[0]);
-            draw_input_panel(frame, state, chunks[1]);
-        })
-        .unwrap()
+        draw_messages_panel(frame, state, chunks[0]);
+        draw_input_panel(frame, state, chunks[1]);
+    })?)
 }
 
 fn draw_messages_panel(
@@ -64,6 +66,11 @@ fn draw_messages_panel(
                     Span::styled(&message.user, Style::default().fg(color)),
                     Span::styled(": ", Style::default().fg(color)),
                     Span::raw(content),
+                ]),
+                MessageType::Error(error) => Spans::from(vec![
+                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled("termchat error: ", Style::default().fg(Color::LightRed)),
+                    Span::styled(error, Style::default().fg(Color::Red)),
                 ]),
             }
         })
