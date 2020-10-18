@@ -1,34 +1,34 @@
-use super::util::{SplitEach};
 use super::state::{ApplicationState, MessageType};
+use super::util::SplitEach;
 
-use tui::{Terminal, Frame};
-use tui::backend::{CrosstermBackend};
-use tui::widgets::{Block, Borders, Paragraph, Wrap};
-use tui::layout::{Layout, Constraint, Direction, Rect, Alignment};
-use tui::style::{Style, Modifier, Color};
+use tui::backend::CrosstermBackend;
+use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
+use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
+use tui::widgets::{Block, Borders, Paragraph, Wrap};
+use tui::{Frame, Terminal};
 
-use std::io::{Stdout};
+use std::io::Stdout;
 
 pub fn draw(terminal: &mut Terminal<CrosstermBackend<Stdout>>, state: &ApplicationState) {
-    terminal.draw(|frame| {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Min(0),
-                    Constraint::Length(6)
-                ].as_ref()
-            )
-            .split(frame.size());
+    terminal
+        .draw(|frame| {
+            let chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
+                .split(frame.size());
 
-        draw_messages_panel(frame, state, chunks[0]);
-        draw_input_panel(frame, state, chunks[1]);
-
-    }).unwrap()
+            draw_messages_panel(frame, state, chunks[0]);
+            draw_input_panel(frame, state, chunks[1]);
+        })
+        .unwrap()
 }
 
-fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
+fn draw_messages_panel(
+    frame: &mut Frame<CrosstermBackend<Stdout>>,
+    state: &ApplicationState,
+    chunk: Rect,
+) {
     const MESSAGE_COLORS: [Color; 5] = [
         Color::Blue,
         Color::Yellow,
@@ -44,45 +44,36 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
                 MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
-            }
-            else {
+            } else {
                 Color::Green //because is a message of the own user
             };
             let date = message.date.format("%H:%M:%S ").to_string();
             match &message.message_type {
-                MessageType::Connection => {
-                    Spans::from(vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(color)),
-                        Span::styled(" is online", Style::default().fg(color)),
-                    ])
-                }
-                MessageType::Disconnection => {
-                    Spans::from(vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(color)),
-                        Span::styled(" is offline", Style::default().fg(color)),
-                    ])
-                }
-                MessageType::Content(content) => {
-                    Spans::from(vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
-                        Span::styled(&message.user, Style::default().fg(color)),
-                        Span::styled(": ", Style::default().fg(color)),
-                        Span::raw(content),
-                    ])
-                },
+                MessageType::Connection => Spans::from(vec![
+                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&message.user, Style::default().fg(color)),
+                    Span::styled(" is online", Style::default().fg(color)),
+                ]),
+                MessageType::Disconnection => Spans::from(vec![
+                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&message.user, Style::default().fg(color)),
+                    Span::styled(" is offline", Style::default().fg(color)),
+                ]),
+                MessageType::Content(content) => Spans::from(vec![
+                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(&message.user, Style::default().fg(color)),
+                    Span::styled(": ", Style::default().fg(color)),
+                    Span::raw(content),
+                ]),
             }
         })
         .collect::<Vec<_>>();
 
     let messages_panel = Paragraph::new(messages)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(Span::styled(
-                "LAN Room",
-                Style::default().add_modifier(Modifier::BOLD)
-            )))
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            "LAN Room",
+            Style::default().add_modifier(Modifier::BOLD),
+        )))
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left)
         .scroll((state.scroll_messages_view() as u16, 0))
@@ -91,27 +82,25 @@ fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &Appl
     frame.render_widget(messages_panel, chunk);
 }
 
-fn draw_input_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &ApplicationState, chunk: Rect) {
+fn draw_input_panel(
+    frame: &mut Frame<CrosstermBackend<Stdout>>,
+    state: &ApplicationState,
+    chunk: Rect,
+) {
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state
         .input()
         .split_each(inner_width)
         .iter()
-        .map(|line| {
-            Spans::from(vec![
-                Span::raw(*line),
-            ])
-        })
+        .map(|line| Spans::from(vec![Span::raw(*line)]))
         .collect::<Vec<_>>();
 
     let input_panel = Paragraph::new(input)
-        .block(Block::default()
-            .borders(Borders::ALL)
-            .title(Span::styled(
-                "Your message",
-                Style::default().add_modifier(Modifier::BOLD)
-            )))
+        .block(Block::default().borders(Borders::ALL).title(Span::styled(
+            "Your message",
+            Style::default().add_modifier(Modifier::BOLD),
+        )))
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left);
 

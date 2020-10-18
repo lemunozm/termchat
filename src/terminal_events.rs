@@ -1,8 +1,11 @@
-use crossterm::event::{Event};
+use crossterm::event::Event;
 
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread::{self, JoinHandle};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-use std::time::{Duration};
+use std::time::Duration;
 
 const EVENT_SAMPLING_TIMEOUT: u64 = 50; //ms
 
@@ -13,20 +16,25 @@ pub struct TerminalEventCollector {
 
 impl TerminalEventCollector {
     pub fn new<C>(event_callback: C) -> TerminalEventCollector
-    where C: Fn(Event) + Send + 'static {
+    where
+        C: Fn(Event) + Send + 'static,
+    {
         let collector_thread_running = Arc::new(AtomicBool::new(true));
         let collector_thread_handle = {
             let running = collector_thread_running.clone();
             let timeout = Duration::from_millis(EVENT_SAMPLING_TIMEOUT);
-            thread::Builder::new().name("termchat: terminal event collector".into()).spawn(move || {
-                while running.load(Ordering::Relaxed) {
-                    if crossterm::event::poll(timeout).unwrap() {
-                        let event = crossterm::event::read().unwrap();
-                        event_callback(event);
+            thread::Builder::new()
+                .name("termchat: terminal event collector".into())
+                .spawn(move || {
+                    while running.load(Ordering::Relaxed) {
+                        if crossterm::event::poll(timeout).unwrap() {
+                            let event = crossterm::event::read().unwrap();
+                            event_callback(event);
+                        }
                     }
-                }
-            })
-        }.unwrap();
+                })
+        }
+        .unwrap();
 
         TerminalEventCollector {
             collector_thread_running,
@@ -37,7 +45,8 @@ impl TerminalEventCollector {
 
 impl Drop for TerminalEventCollector {
     fn drop(&mut self) {
-        self.collector_thread_running.store(false, Ordering::Relaxed);
+        self.collector_thread_running
+            .store(false, Ordering::Relaxed);
         self.collector_thread_handle.take().unwrap().join().unwrap();
     }
 }

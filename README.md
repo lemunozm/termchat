@@ -22,7 +22,7 @@ If you have `~/.cargo/bin` in your PATH (or similar in your OS), you will be abl
 [cargo]: https://doc.rust-lang.org/cargo/getting-started/installation.html
 
 # How it works?
-To not saturate the network, *termchat* uses only a multicast message to found other *termchat* applications in the network once connect by first time.
+To not saturate the network, *termchat* uses only one multicast message at startup to find other *termchat* applications on the network.
 Once a new application has been found by multicast, a TCP connection is created between them.
 
 ## Usage
@@ -33,5 +33,14 @@ $ termchat
 
 to open the application in your terminal.
 
-By default, your computer user name is used.
-You can rename your this name using the argument `-u <name>`, or modified the multicast discovery address (see the application help `--help`).
+By default, your computer user name is used. You can use a different username with `-u <name>`
+
+Also you can modify the multicast discovery address with `-d <address>` 
+
+(see the application help for more info `--help`).
+
+## Frequently Asked Questions
+
+***Q:*** **Hosts are not disoverable**
+
+***A:*** Make sure that no firewall is running (example: ufw), and if that's the case either stop it or add termchat ports to the white list, by default you need to allow port `5877/udp` and `port X/tcp` (currently X is a different with each run)

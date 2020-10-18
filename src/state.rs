@@ -1,8 +1,8 @@
-use message_io::network::{Endpoint};
+use message_io::network::Endpoint;
 
 use chrono::{DateTime, Local};
 
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 pub enum MessageType {
     Connection,
@@ -37,11 +37,16 @@ pub struct ApplicationState {
 }
 
 pub enum CursorMovement {
-   Left, Right, Start, End,
+    Left,
+    Right,
+    Start,
+    End,
 }
 
 pub enum ScrollMovement {
-   Up, Down, Start,
+    Up,
+    Down,
+    Start,
 }
 
 impl ApplicationState {
@@ -120,21 +125,21 @@ impl ApplicationState {
     pub fn input_move_cursor(&mut self, movement: CursorMovement) {
         match movement {
             CursorMovement::Left => {
-               if self.input_cursor > 0 {
-                  self.input_cursor -= 1;
-               }
-            },
+                if self.input_cursor > 0 {
+                    self.input_cursor -= 1;
+                }
+            }
             CursorMovement::Right => {
                 if self.input_cursor < self.input.len() {
                     self.input_cursor += 1;
                 }
-            },
+            }
             CursorMovement::Start => {
                 self.input_cursor = 0;
-            },
+            }
             CursorMovement::End => {
                 self.input_cursor = self.input.len();
-            },
+            }
         }
     }
 
@@ -144,7 +149,7 @@ impl ApplicationState {
                 if self.scroll_messages_view > 0 {
                     self.scroll_messages_view -= 1;
                 }
-            },
+            }
             ScrollMovement::Down => {
                 self.scroll_messages_view += 1;
             }
@@ -155,9 +160,9 @@ impl ApplicationState {
     }
 
     pub fn reset_input(&mut self) -> Option<String> {
-        if self.input.len() > 0 {
+        if !self.input.is_empty() {
             self.input_cursor = 0;
-            return Some(self.input.drain(..).collect())
+            return Some(self.input.drain(..).collect());
         }
         None
     }
