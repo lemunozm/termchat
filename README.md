@@ -33,7 +33,7 @@ $ termchat
 
 to open the application in your terminal.
 
-By default, your computer user name is used. You can use a diffrent username with `-u <name>`
+By default, your computer user name is used. You can use a different username with `-u <name>`
 
 Also you can modify the multicast discovery address with `-d <address>` 
 
