@@ -38,11 +38,16 @@ pub struct Application {
     terminal: Terminal<CrosstermBackend<Stdout>>,
     _terminal_events: TerminalEventCollector,
     discovery_addr: SocketAddr,
+    tcp_server_addr: SocketAddr,
     user_name: String,
 }
 
 impl Application {
-    pub fn new(discovery_addr: SocketAddr, user_name: &str) -> io::Result<Application> {
+    pub fn new(
+        discovery_addr: SocketAddr,
+        tcp_server_port: u16,
+        user_name: &str,
+    ) -> io::Result<Application> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
@@ -58,6 +63,8 @@ impl Application {
             .unwrap();
         let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
+        let tcp_server_addr = ([0, 0, 0, 0], tcp_server_port).into();
+
         Ok(Application {
             event_queue,
             network,
@@ -65,6 +72,7 @@ impl Application {
             // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
             discovery_addr,
+            tcp_server_addr,
             user_name: user_name.into(),
         })
     }
@@ -73,7 +81,7 @@ impl Application {
         let mut state = ApplicationState::new();
         ui::draw(&mut self.terminal, &state);
 
-        let (_, server_addr) = self.network.listen_tcp("0.0.0.0:0").unwrap();
+        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr).unwrap();
         let server_port = server_addr.port();
 
         self.network
@@ -81,7 +89,6 @@ impl Application {
             .unwrap();
 
         let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
-
         let message = NetMessage::HelloLan(self.user_name.clone(), server_port);
         self.network.send(discovery_endpoint, message).unwrap();
 

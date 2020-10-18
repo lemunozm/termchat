@@ -35,7 +35,9 @@ to open the application in your terminal.
 
 By default, your computer user name is used. You can use a different username with `-u <name>`
 
-Also you can modify the multicast discovery address with `-d <address>` 
+You can modify the multicast discovery address with `-d <address>` 
+
+You can set a custom tcp sever port with `-t <port>` 
 
 (see the application help for more info `--help`).
 
@@ -43,4 +45,8 @@ Also you can modify the multicast discovery address with `-d <address>`
 
 ***Q:*** **Hosts are not disoverable**
 
-***A:*** Make sure that no firewall is running (example: ufw), and if that's the case either stop it or add termchat ports to the white list, by default you need to allow port `5877/udp` and `port X/tcp` (currently X is a different with each run)
+***A:*** 
+
+- Make sure that no firewall is running (example: ufw), and if that's the case either stop it or add termchat ports to the white list.
+
+- By default you need to allow port `5877/udp` and `port X/tcp`, `X` is a different with each run. Note that you can specify a custom tcp port as mentioned above and add it to the firewall whitelist.
