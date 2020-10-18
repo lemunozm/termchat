@@ -23,6 +23,13 @@ fn main() {
                 .help("Multicast address to found others 'termchat' applications"),
         )
         .arg(
+            Arg::with_name("tcp_server_port")
+                .long("tcp-server-port")
+                .short("t")
+                .default_value("0")
+                .help("Tcp server port used when communicating with other termchat instances"),
+        )
+        .arg(
             Arg::with_name("username")
                 .long("username")
                 .short("u")
@@ -31,14 +38,19 @@ fn main() {
         )
         .get_matches();
 
-    let addr = match matches.value_of("discovery").unwrap().parse() {
-        Ok(addr) => addr,
+    let discovery_addr = match matches.value_of("discovery").unwrap().parse() {
+        Ok(discovery_addr) => discovery_addr,
         Err(_) => return eprintln!("'discovery' must be a valid multicast address"),
+    };
+
+    let tcp_server_port = match matches.value_of("tcp_server_port").unwrap().parse() {
+        Ok(port) => port,
+        Err(_) => return eprintln!("Unable to parse tcp server port"),
     };
 
     let name = matches.value_of("username").unwrap();
 
-    if let Ok(mut app) = Application::new(addr, &name) {
+    if let Ok(mut app) = Application::new(discovery_addr, tcp_server_port, &name) {
         app.run()
     }
 }
