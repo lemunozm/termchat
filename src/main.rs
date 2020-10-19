@@ -8,8 +8,6 @@ use application::Application;
 
 use clap::{App, Arg};
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
-
 fn main() {
     let os_username = whoami::username();
 

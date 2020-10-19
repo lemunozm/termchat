@@ -1,6 +1,6 @@
 use super::state::{ApplicationState, MessageType};
 use super::util::SplitEach;
-use crate::Result;
+use crate::util::Result;
 
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};

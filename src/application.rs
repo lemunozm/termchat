@@ -1,7 +1,7 @@
 use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
-use crate::Result;
+use crate::util::Result;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{

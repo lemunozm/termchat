@@ -1,4 +1,4 @@
-use crate::Result;
+use crate::util::Result;
 use crossterm::event::Event;
 
 use std::sync::{
