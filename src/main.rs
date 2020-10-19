@@ -55,15 +55,7 @@ fn main() {
     let name = matches.value_of("username").unwrap();
 
     match Application::new(discovery_addr, tcp_server_port, &name) {
-        Ok(mut app) => {
-            if let Err(e) = app.run() {
-                application::clean_terminal();
-                eprintln!("Termchat crashed, err: {}", e);
-            }
-        }
-        Err(e) => {
-            application::clean_terminal();
-            eprintln!("Termchat crashed, err: {}", e);
-        }
+        Ok(mut app) => app.run(),
+        Err(e) => eprintln!("termchat crashed with error: {}", e),
     }
 }

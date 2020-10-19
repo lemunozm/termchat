@@ -35,17 +35,8 @@ impl TerminalEventCollector {
                         Ok(())
                     };
                     while running.load(Ordering::Relaxed) {
-                        if let Err(e) = try_read() {
-                            crate::application::clean_terminal();
-                            eprintln!("Termchat crashed, could not read input event, error: {}", e);
-
-                            // Hack send to ctrlc to the main thread to exit with clean up
-                            event_callback(crossterm::event::Event::Key(
-                                crossterm::event::KeyEvent {
-                                    code: crossterm::event::KeyCode::Char('c'),
-                                    modifiers: crossterm::event::KeyModifiers::CONTROL,
-                                },
-                            ))
+                        if let Err(_e) = try_read() {
+                            // handle e
                         }
                     }
                 })
