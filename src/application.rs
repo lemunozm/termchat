@@ -108,7 +108,7 @@ impl Application {
                                 };
                                 if let Err(e) = try_connect() {
                                     let message = LogMessage::new(
-                                        format!("{} (me)", self.user_name),
+                                        String::from("termchar :"),
                                         MessageType::Error(e.to_string()),
                                     );
                                     state.add_message(message);
@@ -147,20 +147,20 @@ impl Application {
                         }
                         KeyCode::Enter => {
                             if let Some(input) = state.reset_input() {
-                                let mut message = LogMessage::new(
-                                    format!("{} (me)", self.user_name),
-                                    MessageType::Content(input.clone()),
-                                );
-
-                                if let Err(e) = self.network.send_all(
+                                let message = if let Err(e) = self.network.send_all(
                                     state.all_user_endpoints(),
-                                    NetMessage::UserMessage(input),
+                                    NetMessage::UserMessage(input.clone()),
                                 ) {
-                                    message = LogMessage::new(
-                                        format!("{} (me)", self.user_name),
+                                    LogMessage::new(
+                                        String::from("termchar :"),
                                         MessageType::Error(format_errors(e)),
-                                    );
-                                }
+                                    )
+                                } else {
+                                    LogMessage::new(
+                                        format!("{} (me)", self.user_name),
+                                        MessageType::Content(input),
+                                    )
+                                };
 
                                 state.add_message(message);
                             }

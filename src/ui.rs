@@ -31,13 +31,7 @@ fn draw_messages_panel(
     state: &ApplicationState,
     chunk: Rect,
 ) {
-    const MESSAGE_COLORS: [Color; 5] = [
-        Color::Blue,
-        Color::Yellow,
-        Color::Red,
-        Color::Cyan,
-        Color::Magenta,
-    ];
+    const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
         .messages()
@@ -69,8 +63,8 @@ fn draw_messages_panel(
                 ]),
                 MessageType::Error(error) => Spans::from(vec![
                     Span::styled(date, Style::default().fg(Color::DarkGray)),
-                    Span::styled("termchat error: ", Style::default().fg(Color::LightRed)),
-                    Span::styled(error, Style::default().fg(Color::Red)),
+                    Span::styled(&message.user, Style::default().fg(Color::Red)),
+                    Span::styled(error, Style::default().fg(Color::LightRed)),
                 ]),
             }
         })
