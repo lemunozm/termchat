@@ -18,7 +18,7 @@ pub struct TerminalEventCollector {
 impl TerminalEventCollector {
     pub fn new<C>(event_callback: C) -> Result<TerminalEventCollector>
     where
-        C: Fn(Event) + Send + 'static,
+        C: Fn(Result<Event>) + Send + 'static,
     {
         let collector_thread_running = Arc::new(AtomicBool::new(true));
         let collector_thread_handle = {
@@ -30,13 +30,13 @@ impl TerminalEventCollector {
                     let try_read = || -> Result<()> {
                         if crossterm::event::poll(timeout)? {
                             let event = crossterm::event::read()?;
-                            event_callback(event);
+                            event_callback(Ok(event));
                         }
                         Ok(())
                     };
                     while running.load(Ordering::Relaxed) {
-                        if let Err(_e) = try_read() {
-                            // handle e
+                        if let Err(e) = try_read() {
+                            event_callback(Err(e));
                         }
                     }
                 })

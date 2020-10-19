@@ -30,7 +30,9 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
-    Close,
+    // Close event with optionaly an error
+    // Close(None) means no error happened
+    Close(Option<String>),
 }
 
 pub struct Application {
@@ -57,7 +59,6 @@ impl Application {
             }
         }
     }
-
     fn try_new(
         discovery_addr: SocketAddr,
         tcp_server_port: u16,
@@ -69,8 +70,9 @@ impl Application {
         let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
-        let _terminal_events = TerminalEventCollector::new(move |term_event| {
-            sender.send(Event::Terminal(term_event))
+        let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
+            Ok(event) => sender.send(Event::Terminal(event)),
+            Err(e) => sender.send(Event::Close(Some(e.to_string()))),
         })?;
 
         terminal::enable_raw_mode()?;
@@ -94,7 +96,7 @@ impl Application {
     pub fn run(&mut self) {
         if let Err(e) = self.try_run() {
             clean_terminal();
-            eprintln!("termchat crashed with err: {}", e);
+            eprintln!("termchat crashed with error: {}", e);
         }
     }
 
@@ -129,7 +131,7 @@ impl Application {
                                 };
                                 if let Err(e) = try_connect() {
                                     let message = LogMessage::new(
-                                        String::from("termchar :"),
+                                        String::from("termchat :"),
                                         MessageType::Error(e.to_string()),
                                     );
                                     state.add_message(message);
@@ -157,11 +159,15 @@ impl Application {
                 Event::Terminal(term_event) => match term_event {
                     TermEvent::Key(KeyEvent { code, modifiers }) => match code {
                         KeyCode::Esc => {
-                            self.event_queue.sender().send_with_priority(Event::Close);
+                            self.event_queue
+                                .sender()
+                                .send_with_priority(Event::Close(None));
                         }
                         KeyCode::Char(character) => {
                             if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
-                                self.event_queue.sender().send_with_priority(Event::Close);
+                                self.event_queue
+                                    .sender()
+                                    .send_with_priority(Event::Close(None));
                             } else {
                                 state.input_write(character);
                             }
@@ -173,7 +179,7 @@ impl Application {
                                     NetMessage::UserMessage(input.clone()),
                                 ) {
                                     LogMessage::new(
-                                        String::from("termchar :"),
+                                        String::from("termchat :"),
                                         MessageType::Error(format_errors(e)),
                                     )
                                 } else {
@@ -218,7 +224,13 @@ impl Application {
                     TermEvent::Mouse(_) => (),
                     TermEvent::Resize(_, _) => (),
                 },
-                Event::Close => break,
+                Event::Close(e) => {
+                    clean_terminal();
+                    if let Some(error) = e {
+                        eprintln!("termchat crashed with error: {}", error);
+                    }
+                    break;
+                }
             }
             ui::draw(&mut self.terminal, &state)?;
         }
