@@ -143,6 +143,7 @@ impl Application {
                             state.connected_user(endpoint, &user);
                         }
                         NetMessage::UserMessage(content) => {
+                            // Note: can this unwrap actually fail?
                             let user = "???".to_string();
                             let user = state.user_name(endpoint).unwrap_or(&user);
 

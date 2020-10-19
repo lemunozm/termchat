@@ -101,9 +101,11 @@ impl ApplicationState {
     }
 
     pub fn disconnected_user(&mut self, endpoint: Endpoint) {
-        let user = "???".to_string();
-        let user = self.lan_users.remove(&endpoint).unwrap_or(user);
-        self.add_message(LogMessage::new(user, MessageType::Disconnection));
+        if self.lan_users.contains_key(&endpoint) {
+            // unwrap is safe because of the check above
+            let user = self.lan_users.remove(&endpoint).unwrap();
+            self.add_message(LogMessage::new(user, MessageType::Disconnection));
+        }
     }
 
     pub fn input_write(&mut self, character: char) {
