@@ -97,6 +97,8 @@ impl Application {
         if let Err(e) = self.try_run() {
             clean_terminal();
             eprintln!("termchat crashed with error: {}", e);
+        } else {
+            clean_terminal();
         }
     }
 
@@ -226,22 +228,15 @@ impl Application {
                     TermEvent::Resize(_, _) => (),
                 },
                 Event::Close(e) => {
-                    clean_terminal();
                     if let Some(error) = e {
-                        eprintln!("termchat crashed with error: {}", error);
+                        return Err(error.into());
+                    } else {
+                        return Ok(());
                     }
-                    break;
                 }
             }
             ui::draw(&mut self.terminal, &state)?;
         }
-        Ok(())
-    }
-}
-
-impl Drop for Application {
-    fn drop(&mut self) {
-        clean_terminal();
     }
 }
 
