@@ -6,9 +6,14 @@ mod util;
 
 use application::Application;
 
+#[macro_use]
+extern crate lazy_static;
+
 use clap::{App, Arg};
 
 fn main() {
+    util::set_panic_hook();
+
     let os_username = whoami::username();
 
     let matches = App::new(clap::crate_name!())
