@@ -6,14 +6,9 @@ mod util;
 
 use application::Application;
 
-#[macro_use]
-extern crate lazy_static;
-
 use clap::{App, Arg};
 
 fn main() {
-    util::set_panic_hook();
-
     let os_username = whoami::username();
 
     let matches = App::new(clap::crate_name!())
@@ -69,6 +64,6 @@ fn main() {
     };
     if let Some(e) = error {
         // app is now dropped we can print to stderr safely
-        eprintln!("termchat crashed with error: {}", e);
+        eprintln!("termchat exited with error: {}", e);
     }
 }

@@ -1,7 +1,7 @@
 use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
-use crate::util::{Error, Result, PANIC_LOG_PATH};
+use crate::util::{Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -241,8 +241,7 @@ fn clean_terminal() {
     terminal::disable_raw_mode().expect("Could not disable raw mode at exit");
     if std::thread::panicking() {
         eprintln!(
-            "termchat paniced, panic_log is at {}",
-            PANIC_LOG_PATH.display()
+            "termchat paniced, to log the error you can redirect stderror to a file, example: `termchat 2>termchat_log`"
         );
     }
 }
