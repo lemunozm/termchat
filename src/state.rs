@@ -30,7 +30,7 @@ impl LogMessage {
 pub struct ApplicationState {
     messages: Vec<LogMessage>,
     scroll_messages_view: usize,
-    input: String,
+    input: Vec<char>,
     input_cursor: usize,
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
@@ -55,7 +55,7 @@ impl ApplicationState {
         ApplicationState {
             messages: Vec::new(),
             scroll_messages_view: 0,
-            input: String::new(),
+            input: vec![],
             input_cursor: 0,
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
@@ -71,12 +71,14 @@ impl ApplicationState {
         self.scroll_messages_view
     }
 
-    pub fn input(&self) -> &str {
+    pub fn input(&self) -> &[char] {
         &self.input
     }
 
     pub fn input_cursor(&self) -> usize {
-        self.input_cursor
+        self.input.iter().take(self.input_cursor).fold(0, |acc, x| {
+            acc + unicode_width::UnicodeWidthChar::width(*x).unwrap_or(0)
+        })
     }
 
     pub fn user_name(&self, endpoint: Endpoint) -> Option<&String> {

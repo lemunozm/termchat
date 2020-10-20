@@ -25,3 +25,4 @@ tui = { version = "0.12.0", default-features = false, features = ['crossterm'] }
 whoami = "0.9.0"
 chrono = "0.4.19"
 clap = "2.33.3"
+unicode-width = "0.1.8"

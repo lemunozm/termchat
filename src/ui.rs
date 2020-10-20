@@ -90,11 +90,11 @@ fn draw_input_panel(
 ) {
     let inner_width = (chunk.width - 2) as usize;
 
-    let input = state
-        .input()
+    let input = state.input().iter().collect::<String>();
+    let input = input
         .split_each(inner_width)
-        .iter()
-        .map(|line| Spans::from(vec![Span::raw(*line)]))
+        .into_iter()
+        .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
 
     let input_panel = Paragraph::new(input)
@@ -107,8 +107,9 @@ fn draw_input_panel(
 
     frame.render_widget(input_panel, chunk);
 
+    let input_cursor = state.input_cursor();
     frame.set_cursor(
-        chunk.x + 1 + (state.input_cursor() % inner_width) as u16,
-        chunk.y + 1 + (state.input_cursor() / inner_width) as u16,
+        chunk.x + 1 + (input_cursor % inner_width) as u16,
+        chunk.y + 1 + (input_cursor / inner_width) as u16,
     )
 }
