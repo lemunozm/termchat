@@ -1,6 +1,7 @@
 use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
+use crate::util::{Error, Result, PANIC_LOG_PATH};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -29,7 +30,9 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
-    Close,
+    // Close event with an optional error in case of failure
+    // Close(None) means no error happened
+    Close(Option<Error>),
 }
 
 pub struct Application {
@@ -47,23 +50,28 @@ impl Application {
         discovery_addr: SocketAddr,
         tcp_server_port: u16,
         user_name: &str,
-    ) -> io::Result<Application> {
+    ) -> Result<Application> {
+        // Guard to make sure to cleanup if a failure happens in the next lines
+        let _g = Guard;
+
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
         let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
-        let _terminal_events =
-            TerminalEventCollector::new(move |term_event| sender.send(Event::Terminal(term_event)));
+        let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
+            Ok(event) => sender.send(Event::Terminal(event)),
+            Err(e) => sender.send(Event::Close(Some(e))),
+        })?;
 
-        terminal::enable_raw_mode().unwrap();
-        io::stdout()
-            .execute(terminal::EnterAlternateScreen)
-            .unwrap();
+        terminal::enable_raw_mode()?;
+        io::stdout().execute(terminal::EnterAlternateScreen)?;
         let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
 
         let tcp_server_addr = ([0, 0, 0, 0], tcp_server_port).into();
+
+        std::mem::forget(_g);
 
         Ok(Application {
             event_queue,
@@ -77,20 +85,19 @@ impl Application {
         })
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<()> {
         let mut state = ApplicationState::new();
-        ui::draw(&mut self.terminal, &state);
+        ui::draw(&mut self.terminal, &state)?;
 
-        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr).unwrap();
+        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr)?;
         let server_port = server_addr.port();
 
-        self.network
-            .listen_udp_multicast(self.discovery_addr)
-            .unwrap();
+        self.network.listen_udp_multicast(self.discovery_addr)?;
 
-        let discovery_endpoint = self.network.connect_udp(self.discovery_addr).unwrap();
+        let discovery_endpoint = self.network.connect_udp(self.discovery_addr)?;
+
         let message = NetMessage::HelloLan(self.user_name.clone(), server_port);
-        self.network.send(discovery_endpoint, message).unwrap();
+        self.network.send(discovery_endpoint, message)?;
 
         loop {
             match self.event_queue.receive() {
@@ -100,10 +107,20 @@ impl Application {
                         NetMessage::HelloLan(user, server_port) => {
                             let server_addr = (endpoint.addr().ip(), server_port);
                             if user != self.user_name {
-                                let user_endpoint = self.network.connect_tcp(server_addr).unwrap();
-                                let message = NetMessage::HelloUser(self.user_name.clone());
-                                self.network.send(user_endpoint, message).unwrap();
-                                state.connected_user(user_endpoint, &user);
+                                let mut try_connect = || -> Result<()> {
+                                    let user_endpoint = self.network.connect_tcp(server_addr)?;
+                                    let message = NetMessage::HelloUser(self.user_name.clone());
+                                    self.network.send(user_endpoint, message)?;
+                                    state.connected_user(user_endpoint, &user);
+                                    Ok(())
+                                };
+                                if let Err(e) = try_connect() {
+                                    let message = LogMessage::new(
+                                        String::from("termchat :"),
+                                        MessageType::Error(e.to_string()),
+                                    );
+                                    state.add_message(message);
+                                }
                             }
                         }
                         // by tcp:
@@ -111,10 +128,11 @@ impl Application {
                             state.connected_user(endpoint, &user);
                         }
                         NetMessage::UserMessage(content) => {
-                            let user = state.user_name(endpoint).unwrap();
-                            let message =
-                                LogMessage::new(user.into(), MessageType::Content(content));
-                            state.add_message(message);
+                            if let Some(user) = state.user_name(endpoint) {
+                                let message =
+                                    LogMessage::new(user.into(), MessageType::Content(content));
+                                state.add_message(message);
+                            }
                         }
                     },
                     NetEvent::AddedEndpoint(_) => (),
@@ -125,27 +143,36 @@ impl Application {
                 Event::Terminal(term_event) => match term_event {
                     TermEvent::Key(KeyEvent { code, modifiers }) => match code {
                         KeyCode::Esc => {
-                            self.event_queue.sender().send_with_priority(Event::Close);
+                            self.event_queue
+                                .sender()
+                                .send_with_priority(Event::Close(None));
                         }
                         KeyCode::Char(character) => {
                             if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
-                                self.event_queue.sender().send_with_priority(Event::Close);
+                                self.event_queue
+                                    .sender()
+                                    .send_with_priority(Event::Close(None));
                             } else {
                                 state.input_write(character);
                             }
                         }
                         KeyCode::Enter => {
                             if let Some(input) = state.reset_input() {
-                                let message = LogMessage::new(
-                                    format!("{} (me)", self.user_name),
-                                    MessageType::Content(input.clone()),
-                                );
-                                self.network
-                                    .send_all(
-                                        state.all_user_endpoints(),
-                                        NetMessage::UserMessage(input),
+                                let message = if let Err(e) = self.network.send_all(
+                                    state.all_user_endpoints(),
+                                    NetMessage::UserMessage(input.clone()),
+                                ) {
+                                    LogMessage::new(
+                                        String::from("termchat :"),
+                                        MessageType::Error(format_errors(e)),
                                     )
-                                    .unwrap();
+                                } else {
+                                    LogMessage::new(
+                                        format!("{} (me)", self.user_name),
+                                        MessageType::Content(input),
+                                    )
+                                };
+
                                 state.add_message(message);
                             }
                         }
@@ -181,18 +208,55 @@ impl Application {
                     TermEvent::Mouse(_) => (),
                     TermEvent::Resize(_, _) => (),
                 },
-                Event::Close => break,
+                Event::Close(e) => {
+                    if let Some(error) = e {
+                        return Err(error);
+                    } else {
+                        return Ok(());
+                    }
+                }
             }
-            ui::draw(&mut self.terminal, &state);
+            ui::draw(&mut self.terminal, &state)?;
         }
     }
 }
 
 impl Drop for Application {
     fn drop(&mut self) {
-        io::stdout()
-            .execute(terminal::LeaveAlternateScreen)
-            .unwrap();
-        terminal::disable_raw_mode().unwrap()
+        clean_terminal();
     }
+}
+
+struct Guard;
+impl Drop for Guard {
+    fn drop(&mut self) {
+        clean_terminal();
+    }
+}
+
+fn clean_terminal() {
+    io::stdout()
+        .execute(terminal::LeaveAlternateScreen)
+        .expect("Could not leave alternate screen");
+    terminal::disable_raw_mode().expect("Could not disable raw mode at exit");
+    if std::thread::panicking() {
+        eprintln!(
+            "termchat paniced, panic_log is at {}",
+            PANIC_LOG_PATH.display()
+        );
+    }
+}
+
+fn format_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
+    let mut out = String::new();
+    for (endpoint, error) in e {
+        let msg = format!("Failed to connect to {}, error: {}", endpoint, error);
+        out.push_str(&msg);
+        out.push('\n');
+    }
+    // remove last new line
+    if !out.is_empty() {
+        out.pop();
+    }
+    out
 }

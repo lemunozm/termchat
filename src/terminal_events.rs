@@ -1,3 +1,4 @@
+use crate::util::Result;
 use crossterm::event::Event;
 
 use std::sync::{
@@ -15,9 +16,9 @@ pub struct TerminalEventCollector {
 }
 
 impl TerminalEventCollector {
-    pub fn new<C>(event_callback: C) -> TerminalEventCollector
+    pub fn new<C>(event_callback: C) -> Result<TerminalEventCollector>
     where
-        C: Fn(Event) + Send + 'static,
+        C: Fn(Result<Event>) + Send + 'static,
     {
         let collector_thread_running = Arc::new(AtomicBool::new(true));
         let collector_thread_handle = {
@@ -26,20 +27,25 @@ impl TerminalEventCollector {
             thread::Builder::new()
                 .name("termchat: terminal event collector".into())
                 .spawn(move || {
+                    let try_read = || -> Result<()> {
+                        if crossterm::event::poll(timeout)? {
+                            let event = crossterm::event::read()?;
+                            event_callback(Ok(event));
+                        }
+                        Ok(())
+                    };
                     while running.load(Ordering::Relaxed) {
-                        if crossterm::event::poll(timeout).unwrap() {
-                            let event = crossterm::event::read().unwrap();
-                            event_callback(event);
+                        if let Err(e) = try_read() {
+                            event_callback(Err(e));
                         }
                     }
                 })
-        }
-        .unwrap();
+        }?;
 
-        TerminalEventCollector {
+        Ok(TerminalEventCollector {
             collector_thread_running,
             collector_thread_handle: Some(collector_thread_handle),
-        }
+        })
     }
 }
 
@@ -47,6 +53,11 @@ impl Drop for TerminalEventCollector {
     fn drop(&mut self) {
         self.collector_thread_running
             .store(false, Ordering::Relaxed);
-        self.collector_thread_handle.take().unwrap().join().unwrap();
+        // the first unwrap is safe, beacuse we now the handle is some and this is the only time we take it
+        self.collector_thread_handle
+            .take()
+            .unwrap()
+            .join()
+            .expect("Error while joining collector thread handle");
     }
 }

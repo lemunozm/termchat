@@ -477,6 +477,7 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm 0.18.0",
+ "lazy_static",
  "message-io",
  "serde",
  "tui",
