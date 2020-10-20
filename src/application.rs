@@ -128,13 +128,11 @@ impl Application {
                             state.connected_user(endpoint, &user);
                         }
                         NetMessage::UserMessage(content) => {
-                            // Note: can this unwrap actually fail?
-                            let user = "???".to_string();
-                            let user = state.user_name(endpoint).unwrap_or(&user);
-
-                            let message =
-                                LogMessage::new(user.into(), MessageType::Content(content));
-                            state.add_message(message);
+                            if let Some(user) = state.user_name(endpoint) {
+                                let message =
+                                    LogMessage::new(user.into(), MessageType::Content(content));
+                                state.add_message(message);
+                            }
                         }
                     },
                     NetEvent::AddedEndpoint(_) => (),
