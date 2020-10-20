@@ -1,7 +1,7 @@
 use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
-use crate::util::Result;
+use crate::util::{Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -30,9 +30,9 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
-    // Close event with optionaly an error
+    // Close event with an optional error in case of failure
     // Close(None) means no error happened
-    Close(Option<String>),
+    Close(Option<Error>),
 }
 
 pub struct Application {
@@ -62,7 +62,7 @@ impl Application {
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
             Ok(event) => sender.send(Event::Terminal(event)),
-            Err(e) => sender.send(Event::Close(Some(e.to_string()))),
+            Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
         terminal::enable_raw_mode()?;
@@ -210,7 +210,7 @@ impl Application {
                 },
                 Event::Close(e) => {
                     if let Some(error) = e {
-                        return Err(error.into());
+                        return Err(error);
                     } else {
                         return Ok(());
                     }
