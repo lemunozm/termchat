@@ -51,19 +51,9 @@ impl Application {
         tcp_server_port: u16,
         user_name: &str,
     ) -> Result<Application> {
-        match Self::try_new(discovery_addr, tcp_server_port, user_name) {
-            Ok(app) => Ok(app),
-            Err(e) => {
-                clean_terminal();
-                Err(e)
-            }
-        }
-    }
-    fn try_new(
-        discovery_addr: SocketAddr,
-        tcp_server_port: u16,
-        user_name: &str,
-    ) -> Result<Application> {
+        // Guard to make sure to cleanup if a failure happens in the next lines
+        let _g = Guard;
+
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
@@ -81,6 +71,8 @@ impl Application {
 
         let tcp_server_addr = ([0, 0, 0, 0], tcp_server_port).into();
 
+        std::mem::forget(_g);
+
         Ok(Application {
             event_queue,
             network,
@@ -93,16 +85,7 @@ impl Application {
         })
     }
 
-    pub fn run(&mut self) {
-        if let Err(e) = self.try_run() {
-            clean_terminal();
-            eprintln!("termchat crashed with error: {}", e);
-        } else {
-            clean_terminal();
-        }
-    }
-
-    fn try_run(&mut self) -> Result<()> {
+    pub fn run(&mut self) -> Result<()> {
         let mut state = ApplicationState::new();
         ui::draw(&mut self.terminal, &state)?;
 
@@ -237,6 +220,19 @@ impl Application {
             }
             ui::draw(&mut self.terminal, &state)?;
         }
+    }
+}
+
+impl Drop for Application {
+    fn drop(&mut self) {
+        clean_terminal();
+    }
+}
+
+struct Guard;
+impl Drop for Guard {
+    fn drop(&mut self) {
+        clean_terminal();
     }
 }
 
