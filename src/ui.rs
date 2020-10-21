@@ -55,12 +55,15 @@ fn draw_messages_panel(
                     Span::styled(&message.user, Style::default().fg(color)),
                     Span::styled(" is offline", Style::default().fg(color)),
                 ]),
-                MessageType::Content(content) => Spans::from(vec![
-                    Span::styled(date, Style::default().fg(Color::DarkGray)),
-                    Span::styled(&message.user, Style::default().fg(color)),
-                    Span::styled(": ", Style::default().fg(color)),
-                    Span::raw(content),
-                ]),
+                MessageType::Content(content) => {
+                    let mut ui_message = vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(color)),
+                        Span::styled(": ", Style::default().fg(color)),
+                    ];
+                    ui_message.extend(parse_content(content));
+                    Spans::from(ui_message)
+                }
                 MessageType::Error(error) => Spans::from(vec![
                     Span::styled(date, Style::default().fg(Color::DarkGray)),
                     Span::styled(&message.user, Style::default().fg(Color::Red)),
@@ -81,6 +84,27 @@ fn draw_messages_panel(
         .wrap(Wrap { trim: false });
 
     frame.render_widget(messages_panel, chunk);
+}
+
+fn parse_content<'a>(content: &'a str) -> Vec<Span<'a>> {
+    const SEND_COMMAND: &str = "?send";
+
+    if content.starts_with(SEND_COMMAND) {
+        content
+            .splitn(2, SEND_COMMAND)
+            .enumerate()
+            .map(|(index, part)| {
+                // ?send
+                if index == 0 {
+                    Span::styled(SEND_COMMAND, Style::default().fg(Color::LightYellow))
+                } else {
+                    Span::raw(part)
+                }
+            })
+            .collect()
+    } else {
+        vec![Span::raw(content)]
+    }
 }
 
 fn draw_input_panel(

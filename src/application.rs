@@ -22,9 +22,10 @@ use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
-    HelloLan(String, u16), // user_name, server_port
-    HelloUser(String),     // user_name
-    UserMessage(String),   // content
+    HelloLan(String, u16),     // user_name, server_port
+    HelloUser(String),         // user_name
+    UserMessage(String),       // content
+    UserData(String, Vec<u8>), // file_name, data
 }
 
 enum Event {
@@ -134,6 +135,25 @@ impl Application {
                                 state.add_message(message);
                             }
                         }
+                        NetMessage::UserData(file_name, data) => {
+                            if state.user_name(endpoint).is_some() {
+                                // safe unwrap due to check
+                                let user = state.user_name(endpoint).unwrap().to_owned();
+                                let path = std::env::temp_dir().join("termchat");
+                                let user_path = path.join(&user);
+                                // Ignore already exists error
+                                let _ = std::fs::create_dir_all(&user_path);
+                                let file_path = user_path.join(file_name);
+
+                                if let Err(e) = std::fs::write(file_path, data) {
+                                    state.add_message(termchat_error_message(format!(
+                                        "termchat: Failed to write data sent from user: {}",
+                                        user
+                                    )));
+                                    state.add_message(termchat_error_message(e.to_string()));
+                                }
+                            }
+                        }
                     },
                     NetEvent::AddedEndpoint(_) => (),
                     NetEvent::RemovedEndpoint(endpoint) => {
@@ -162,18 +182,21 @@ impl Application {
                                     state.all_user_endpoints(),
                                     NetMessage::UserMessage(input.clone()),
                                 ) {
-                                    LogMessage::new(
-                                        String::from("termchat :"),
-                                        MessageType::Error(format_errors(e)),
-                                    )
+                                    termchat_error_message(stringify_sendall_errors(e))
                                 } else {
                                     LogMessage::new(
                                         format!("{} (me)", self.user_name),
-                                        MessageType::Content(input),
+                                        MessageType::Content(input.clone()),
                                     )
                                 };
 
                                 state.add_message(message);
+
+                                if let Err(parse_error) = self.parse_input(&input, &mut state) {
+                                    state.add_message(termchat_error_message(
+                                        parse_error.to_string(),
+                                    ));
+                                }
                             }
                         }
                         KeyCode::Delete => {
@@ -219,6 +242,31 @@ impl Application {
             ui::draw(&mut self.terminal, &state)?;
         }
     }
+
+    fn parse_input(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
+        const SEND_COMMAND: &str = "?send";
+        const READ_FILENAME_ERROR: &str = "Unable to read file name";
+
+        if input.starts_with(SEND_COMMAND) {
+            let path =
+                std::path::Path::new(input.split_whitespace().nth(1).ok_or("No file specifed")?);
+            let file_name = path
+                .file_name()
+                .ok_or(READ_FILENAME_ERROR)?
+                .to_str()
+                .ok_or(READ_FILENAME_ERROR)?
+                .to_string();
+            let data = std::fs::read(path)?;
+
+            self.network
+                .send_all(
+                    state.all_user_endpoints(),
+                    NetMessage::UserData(file_name, data),
+                )
+                .map_err(stringify_sendall_errors)?;
+        }
+        Ok(())
+    }
 }
 
 impl Drop for Application {
@@ -246,7 +294,11 @@ fn clean_terminal() {
     }
 }
 
-fn format_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
+fn termchat_error_message(e: String) -> LogMessage {
+    LogMessage::new(String::from("termchat: "), MessageType::Error(e))
+}
+
+fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
     let mut out = String::new();
     for (endpoint, error) in e {
         let msg = format!("Failed to connect to {}, error: {}", endpoint, error);
