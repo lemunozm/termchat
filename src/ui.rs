@@ -107,6 +107,6 @@ fn draw_input_panel(
 
     frame.render_widget(input_panel, chunk);
 
-    let input_cursor = state.input_cursor(inner_width);
+    let input_cursor = state.ui_input_cursor(inner_width);
     frame.set_cursor(chunk.x + 1 + input_cursor.0, chunk.y + 1 + input_cursor.1)
 }

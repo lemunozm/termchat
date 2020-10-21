@@ -75,28 +75,30 @@ impl ApplicationState {
         &self.input
     }
 
-    pub fn input_cursor(&self, width: usize) -> (u16, u16) {
-        let mut last_pos = (0, 0);
+    pub fn ui_input_cursor(&self, width: usize) -> (u16, u16) {
+        let mut position = (0, 0);
+
         for current_char in self.input.iter().take(self.input_cursor) {
             let char_width = unicode_width::UnicodeWidthChar::width(*current_char).unwrap_or(0);
 
-            last_pos.0 += char_width;
+            position.0 += char_width;
 
-            match last_pos.0.cmp(&width) {
+            match position.0.cmp(&width) {
                 std::cmp::Ordering::Equal => {
-                    last_pos.0 = 0;
-                    last_pos.1 += 1;
+                    position.0 = 0;
+                    position.1 += 1;
                 }
                 std::cmp::Ordering::Greater => {
                     // Handle a char with width > 1 at the end of the row
-                    // width - 1 accounts for the empty column left behind
-                    last_pos.0 -= width - 1;
-                    last_pos.1 += 1;
+                    // width - (char_width - 1) accounts for the empty column(s) left behind
+                    position.0 -= width - (char_width.saturating_sub(1));
+                    position.1 += 1;
                 }
                 _ => (),
             }
         }
-        (last_pos.0 as u16, last_pos.1 as u16)
+
+        (position.0 as u16, position.1 as u16)
     }
 
     pub fn user_name(&self, endpoint: Endpoint) -> Option<&String> {
