@@ -91,7 +91,7 @@ impl ApplicationState {
                 std::cmp::Ordering::Greater => {
                     // Handle a char with width > 1 at the end of the row
                     // width - (char_width - 1) accounts for the empty column(s) left behind
-                    position.0 -= width - (char_width.saturating_sub(1));
+                    position.0 -= width - (char_width - 1);
                     position.1 += 1;
                 }
                 _ => (),
