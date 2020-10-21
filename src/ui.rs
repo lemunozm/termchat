@@ -1,5 +1,5 @@
 use super::state::{ApplicationState, MessageType};
-use super::util::SplitEach;
+use super::util::split_each;
 use crate::util::Result;
 
 use tui::backend::CrosstermBackend;
@@ -91,8 +91,7 @@ fn draw_input_panel(
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();
-    let input = input
-        .split_each(inner_width)
+    let input = split_each(input, inner_width)
         .into_iter()
         .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
