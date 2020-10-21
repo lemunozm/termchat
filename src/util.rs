@@ -8,23 +8,25 @@ pub trait SplitEach {
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 impl SplitEach for str {
-    fn split_each(&self, n: usize) -> Vec<String> {
-        let mut ll = Vec::with_capacity(self.width() / n);
-        let mut l = String::new();
+    fn split_each(&self, width: usize) -> Vec<String> {
+        let mut splitted = Vec::with_capacity(self.width() / width);
+        let mut row = String::new();
 
-        let mut i = 0;
+        let mut index = 0;
 
-        for c in self.chars() {
-            if i != 0 && i >= n {
-                ll.push(l.drain(..).collect());
-                i = 0;
+        for current_char in self.chars() {
+            if (index != 0 && index == width) || index + current_char.width().unwrap_or(0) > width {
+                splitted.push(row.drain(..).collect());
+                index = 0;
             }
-            l.push(c);
-            i += c.width().unwrap_or(0);
+
+            row.push(current_char);
+            index += current_char.width().unwrap_or(0);
         }
-        if !l.is_empty() {
-            ll.push(l.drain(..).collect());
+        // leftover
+        if !row.is_empty() {
+            splitted.push(row.drain(..).collect());
         }
-        ll
+        splitted
     }
 }
