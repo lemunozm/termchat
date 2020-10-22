@@ -22,10 +22,10 @@ use std::net::SocketAddr;
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
-    HelloLan(String, u16),     // user_name, server_port
-    HelloUser(String),         // user_name
-    UserMessage(String),       // content
-    UserData(String, Vec<u8>), // file_name, data
+    HelloLan(String, u16), // user_name, server_port
+    HelloUser(String),     // user_name
+    UserMessage(String),   // content
+    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, data
 }
 
 enum Event {
@@ -135,17 +135,43 @@ impl Application {
                                 state.add_message(message);
                             }
                         }
-                        NetMessage::UserData(file_name, data) => {
+                        NetMessage::UserData(file_name, maybe_data, maybe_error) => {
+                            use std::io::Write;
                             if state.user_name(endpoint).is_some() {
                                 // safe unwrap due to check
                                 let user = state.user_name(endpoint).unwrap().to_owned();
-                                let path = std::env::temp_dir().join("termchat");
-                                let user_path = path.join(&user);
-                                // Ignore already exists error
-                                let _ = std::fs::create_dir_all(&user_path);
-                                let file_path = user_path.join(file_name);
 
-                                if let Err(e) = std::fs::write(file_path, data) {
+                                let try_write = || -> Result<()> {
+                                    if let Some(error) = maybe_error {
+                                        return Err(format!(
+                                            "{} encountred an error while sending {}, error: {}",
+                                            user, file_name, error
+                                        )
+                                        .into());
+                                    }
+                                    // if the error is none we know that maybe_data is some
+                                    let (data, bytes_read) = maybe_data.unwrap();
+
+                                    //done
+                                    if bytes_read == 0 {
+                                        return Ok(());
+                                    }
+
+                                    let path = std::env::temp_dir().join("termchat");
+                                    let user_path = path.join(&user);
+                                    // Ignore already exists error
+                                    let _ = std::fs::create_dir_all(&user_path);
+                                    let file_path = user_path.join(file_name);
+
+                                    let mut file = std::fs::OpenOptions::new()
+                                        .create(true)
+                                        .append(true)
+                                        .open(file_path)?;
+                                    file.write_all(&data)?;
+                                    Ok(())
+                                };
+
+                                if let Err(e) = try_write() {
                                     state.add_message(termchat_error_message(format!(
                                         "termchat: Failed to write data sent from user: {}",
                                         user
@@ -244,6 +270,7 @@ impl Application {
     }
 
     fn parse_input(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
+        use std::io::Read;
         const SEND_COMMAND: &str = "?send";
         const READ_FILENAME_ERROR: &str = "Unable to read file name";
 
@@ -256,14 +283,43 @@ impl Application {
                 .to_str()
                 .ok_or(READ_FILENAME_ERROR)?
                 .to_string();
-            let data = std::fs::read(path)?;
 
-            self.network
-                .send_all(
-                    state.all_user_endpoints(),
-                    NetMessage::UserData(file_name, data),
-                )
-                .map_err(stringify_sendall_errors)?;
+            let mut file = std::fs::File::open(path)?;
+            const BLOCK: usize = 1024;
+            let mut data = [0; BLOCK];
+
+            loop {
+                match file.read(&mut data) {
+                    Ok(bytes_read) => {
+                        let data_to_send = data[..bytes_read].to_vec();
+
+                        self.network
+                            .send_all(
+                                state.all_user_endpoints(),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data_to_send, bytes_read)),
+                                    None,
+                                ),
+                            )
+                            .map_err(stringify_sendall_errors)?;
+
+                        // done
+                        if bytes_read == 0 {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        self.network
+                            .send_all(
+                                state.all_user_endpoints(),
+                                NetMessage::UserData(file_name, None, Some(e.to_string())),
+                            )
+                            .map_err(stringify_sendall_errors)?;
+                        return Err(e.into());
+                    }
+                }
+            }
         }
         Ok(())
     }
