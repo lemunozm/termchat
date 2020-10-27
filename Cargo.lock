@@ -480,6 +480,7 @@ dependencies = [
  "message-io",
  "serde",
  "tui",
+ "unicode-width",
  "whoami",
 ]
 

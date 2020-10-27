@@ -30,7 +30,7 @@ impl LogMessage {
 pub struct ApplicationState {
     messages: Vec<LogMessage>,
     scroll_messages_view: usize,
-    input: String,
+    input: Vec<char>,
     input_cursor: usize,
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
@@ -55,7 +55,7 @@ impl ApplicationState {
         ApplicationState {
             messages: Vec::new(),
             scroll_messages_view: 0,
-            input: String::new(),
+            input: vec![],
             input_cursor: 0,
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
@@ -71,12 +71,34 @@ impl ApplicationState {
         self.scroll_messages_view
     }
 
-    pub fn input(&self) -> &str {
+    pub fn input(&self) -> &[char] {
         &self.input
     }
 
-    pub fn input_cursor(&self) -> usize {
-        self.input_cursor
+    pub fn ui_input_cursor(&self, width: usize) -> (u16, u16) {
+        let mut position = (0, 0);
+
+        for current_char in self.input.iter().take(self.input_cursor) {
+            let char_width = unicode_width::UnicodeWidthChar::width(*current_char).unwrap_or(0);
+
+            position.0 += char_width;
+
+            match position.0.cmp(&width) {
+                std::cmp::Ordering::Equal => {
+                    position.0 = 0;
+                    position.1 += 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    // Handle a char with width > 1 at the end of the row
+                    // width - (char_width - 1) accounts for the empty column(s) left behind
+                    position.0 -= width - (char_width - 1);
+                    position.1 += 1;
+                }
+                _ => (),
+            }
+        }
+
+        (position.0 as u16, position.1 as u16)
     }
 
     pub fn user_name(&self, endpoint: Endpoint) -> Option<&String> {

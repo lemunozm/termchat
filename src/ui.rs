@@ -1,5 +1,5 @@
 use super::state::{ApplicationState, MessageType};
-use super::util::SplitEach;
+use super::util::split_each;
 use crate::util::Result;
 
 use tui::backend::CrosstermBackend;
@@ -90,11 +90,10 @@ fn draw_input_panel(
 ) {
     let inner_width = (chunk.width - 2) as usize;
 
-    let input = state
-        .input()
-        .split_each(inner_width)
-        .iter()
-        .map(|line| Spans::from(vec![Span::raw(*line)]))
+    let input = state.input().iter().collect::<String>();
+    let input = split_each(input, inner_width)
+        .into_iter()
+        .map(|line| Spans::from(vec![Span::raw(line)]))
         .collect::<Vec<_>>();
 
     let input_panel = Paragraph::new(input)
@@ -107,8 +106,6 @@ fn draw_input_panel(
 
     frame.render_widget(input_panel, chunk);
 
-    frame.set_cursor(
-        chunk.x + 1 + (state.input_cursor() % inner_width) as u16,
-        chunk.y + 1 + (state.input_cursor() / inner_width) as u16,
-    )
+    let input_cursor = state.ui_input_cursor(inner_width);
+    frame.set_cursor(chunk.x + 1 + input_cursor.0, chunk.y + 1 + input_cursor.1)
 }
