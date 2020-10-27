@@ -1,6 +1,6 @@
 # Changelog
 
-## Release 0.2.0
+## Release 1.0.0
 - Fixed a network issue that made peers not discoverable through LAN.
 - Added utf8 support.
 - Added CLI option to specify the tcp port.
