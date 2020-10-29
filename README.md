@@ -19,6 +19,20 @@ $ cargo install termchat
 ```
 If you have `~/.cargo/bin` in your PATH (or similar in your OS), you will be able to use *termchat* everywhere in your computer!
 
+## Arch Linux
+
+`termchat` can be installed from available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=termchat&outdated=&SB=n&SO=a&PP=50&do_Search=Go) using an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers). For example,
+
+```sh
+$ yay -S termchat
+```
+
+If you prefer, you can clone the [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=termchat&outdated=&SB=n&SO=a&PP=50&do_Search=Go) and then compile them with [makepkg](https://wiki.archlinux.org/index.php/Makepkg). For example,
+
+```sh
+$ git clone https://aur.archlinux.org/termchat.git && cd termchat && makepkg -si
+```
+
 [cargo]: https://doc.rust-lang.org/cargo/getting-started/installation.html
 
 # How it works?
