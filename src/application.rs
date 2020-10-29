@@ -298,7 +298,7 @@ impl Application {
             state.progress.start(file_size);
 
             let mut file = std::fs::File::open(path)?;
-            const BLOCK: usize = 32768;
+            const BLOCK: usize = 65536;
             let mut data = [0; BLOCK];
 
             loop {
