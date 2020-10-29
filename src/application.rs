@@ -154,6 +154,15 @@ impl Application {
 
                                     //done
                                     if bytes_read == 0 {
+                                        let msg = format!(
+                                            "Successfully received file {} from user {} !",
+                                            file_name, user
+                                        );
+                                        let msg = LogMessage::new(
+                                            "Termchat".into(),
+                                            MessageType::Content(msg),
+                                        );
+                                        state.add_message(msg);
                                         return Ok(());
                                     }
 
@@ -276,7 +285,7 @@ impl Application {
 
         if input.starts_with(SEND_COMMAND) {
             let path =
-                std::path::Path::new(input.split_whitespace().nth(1).ok_or("No file specifed")?);
+                std::path::Path::new(input.split_whitespace().nth(1).ok_or("No file specified")?);
             let file_name = path
                 .file_name()
                 .ok_or(READ_FILENAME_ERROR)?
@@ -284,13 +293,18 @@ impl Application {
                 .ok_or(READ_FILENAME_ERROR)?
                 .to_string();
 
+            use std::convert::TryInto;
+            let file_size = std::fs::metadata(path)?.len().try_into()?;
+            state.progress.start(file_size);
+
             let mut file = std::fs::File::open(path)?;
-            const BLOCK: usize = 1024;
+            const BLOCK: usize = 32768;
             let mut data = [0; BLOCK];
 
             loop {
                 match file.read(&mut data) {
                     Ok(bytes_read) => {
+                        state.progress.advance(bytes_read);
                         let data_to_send = data[..bytes_read].to_vec();
 
                         self.network
@@ -306,10 +320,15 @@ impl Application {
 
                         // done
                         if bytes_read == 0 {
+                            let msg = format!("Successfully sent file {} !", file_name);
+                            let msg = LogMessage::new("Termchat".into(), MessageType::Content(msg));
+                            state.add_message(msg);
                             break;
                         }
                     }
                     Err(e) => {
+                        state.progress.done();
+
                         self.network
                             .send_all(
                                 state.all_user_endpoints(),
@@ -319,7 +338,10 @@ impl Application {
                         return Err(e.into());
                     }
                 }
+                ui::draw(&mut self.terminal, &state)?;
             }
+            state.progress.done();
+            ui::draw(&mut self.terminal, &state)?;
         }
         Ok(())
     }
@@ -351,7 +373,7 @@ fn clean_terminal() {
 }
 
 fn termchat_error_message(e: String) -> LogMessage {
-    LogMessage::new(String::from("termchat: "), MessageType::Error(e))
+    LogMessage::new(String::from("Termchat: "), MessageType::Error(e))
 }
 
 fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {

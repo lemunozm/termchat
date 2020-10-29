@@ -33,7 +33,7 @@ fn draw_messages_panel(
 ) {
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
-    let messages = state
+    let mut messages = state
         .messages()
         .iter()
         .rev()
@@ -72,6 +72,24 @@ fn draw_messages_panel(
             }
         })
         .collect::<Vec<_>>();
+
+    if let Some((current, max)) = state.progress() {
+        let color = Color::Red;
+
+        let width = chunk.width - 20;
+        let ui_step = width as f32 / max as f32;
+        let ui_current = (current as f32 * ui_step) as usize;
+        let ui_remaining = ((max.saturating_sub(current)) as f32 * ui_step) as usize;
+
+        let current: String = std::iter::repeat("#").take(ui_current).collect();
+        let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
+        let msg = format!("[{}{}]", current, remaining);
+        let ui_message = vec![
+            Span::styled("Termchat: ", Style::default().fg(color)),
+            Span::styled(msg, Style::default().fg(color)),
+        ];
+        messages.insert(0, Spans::from(ui_message));
+    }
 
     let messages_panel = Paragraph::new(messages)
         .block(Block::default().borders(Borders::ALL).title(Span::styled(

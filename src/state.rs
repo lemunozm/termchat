@@ -35,6 +35,32 @@ pub struct ApplicationState {
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
     last_user_id: usize,
+    pub progress: Progress,
+}
+
+pub struct Progress {
+    max: usize,
+    current: usize,
+    state: ProgressState,
+}
+enum ProgressState {
+    Idle,
+    Working,
+    Done,
+}
+
+impl Progress {
+    pub fn start(&mut self, max: usize) {
+        self.state = ProgressState::Working;
+        self.max = max;
+    }
+    pub fn advance(&mut self, n: usize) {
+        self.current += n;
+    }
+    pub fn done(&mut self) {
+        self.state = ProgressState::Done;
+        self.current = 0;
+    }
 }
 
 pub enum CursorMovement {
@@ -60,6 +86,11 @@ impl ApplicationState {
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
             last_user_id: 0,
+            progress: Progress {
+                max: 0,
+                current: 0,
+                state: ProgressState::Idle,
+            },
         }
     }
 
@@ -195,5 +226,13 @@ impl ApplicationState {
 
     pub fn add_message(&mut self, message: LogMessage) {
         self.messages.push(message);
+    }
+
+    pub fn progress(&self) -> Option<(usize, usize)> {
+        if let ProgressState::Working = self.progress.state {
+            Some((self.progress.current, self.progress.max))
+        } else {
+            None
+        }
     }
 }
