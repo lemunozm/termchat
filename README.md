@@ -19,6 +19,8 @@ $ cargo install termchat
 ```
 If you have `~/.cargo/bin` in your PATH (or similar in your OS), you will be able to use *termchat* everywhere in your computer!
 
+Also, you can download the last release for your machine from the [releases](https://github.com/lemunozm/termchat/releases).
+
 ## Arch Linux
 
 `termchat` can be installed from available [AUR packages](https://aur.archlinux.org/packages/?O=0&SeB=b&K=termchat&outdated=&SB=n&SO=a&PP=50&do_Search=Go) using an [AUR helper](https://wiki.archlinux.org/index.php/AUR_helpers). For example,
