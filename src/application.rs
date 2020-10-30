@@ -1,7 +1,9 @@
-use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
+use super::state::{
+    ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement, TermchatMessageType,
+};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
-use crate::util::{Error, Result};
+use crate::util::{stringify_sendall_errors, termchat_message, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -20,12 +22,14 @@ use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
+mod commands;
+
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
     HelloLan(String, u16), // user_name, server_port
     HelloUser(String),     // user_name
     UserMessage(String),   // content
-    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, data
+    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
 }
 
 enum Event {
@@ -116,10 +120,8 @@ impl Application {
                                     Ok(())
                                 };
                                 if let Err(e) = try_connect() {
-                                    let message = LogMessage::new(
-                                        String::from("termchat :"),
-                                        MessageType::Error(e.to_string()),
-                                    );
+                                    let message =
+                                        termchat_message(e.to_string(), TermchatMessageType::Error);
                                     state.add_message(message);
                                 }
                             }
@@ -158,9 +160,9 @@ impl Application {
                                             "Successfully received file {} from user {} !",
                                             file_name, user
                                         );
-                                        let msg = LogMessage::new(
-                                            "Termchat".into(),
-                                            MessageType::Content(msg),
+                                        let msg = termchat_message(
+                                            msg,
+                                            TermchatMessageType::Notification,
                                         );
                                         state.add_message(msg);
                                         return Ok(());
@@ -181,11 +183,18 @@ impl Application {
                                 };
 
                                 if let Err(e) = try_write() {
-                                    state.add_message(termchat_error_message(format!(
+                                    let message = format!(
                                         "termchat: Failed to write data sent from user: {}",
                                         user
-                                    )));
-                                    state.add_message(termchat_error_message(e.to_string()));
+                                    );
+                                    state.add_message(termchat_message(
+                                        message,
+                                        TermchatMessageType::Error,
+                                    ));
+                                    state.add_message(termchat_message(
+                                        e.to_string(),
+                                        TermchatMessageType::Error,
+                                    ));
                                 }
                             }
                         }
@@ -217,7 +226,10 @@ impl Application {
                                     state.all_user_endpoints(),
                                     NetMessage::UserMessage(input.clone()),
                                 ) {
-                                    termchat_error_message(stringify_sendall_errors(e))
+                                    termchat_message(
+                                        stringify_sendall_errors(e),
+                                        TermchatMessageType::Error,
+                                    )
                                 } else {
                                     LogMessage::new(
                                         format!("{} (me)", self.user_name),
@@ -228,8 +240,9 @@ impl Application {
                                 state.add_message(message);
 
                                 if let Err(parse_error) = self.parse_input(&input, &mut state) {
-                                    state.add_message(termchat_error_message(
+                                    state.add_message(termchat_message(
                                         parse_error.to_string(),
+                                        TermchatMessageType::Error,
                                     ));
                                 }
                             }
@@ -277,74 +290,6 @@ impl Application {
             ui::draw(&mut self.terminal, &state)?;
         }
     }
-
-    fn parse_input(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
-        use std::io::Read;
-        const SEND_COMMAND: &str = "?send";
-        const READ_FILENAME_ERROR: &str = "Unable to read file name";
-
-        if input.starts_with(SEND_COMMAND) {
-            let path =
-                std::path::Path::new(input.split_whitespace().nth(1).ok_or("No file specified")?);
-            let file_name = path
-                .file_name()
-                .ok_or(READ_FILENAME_ERROR)?
-                .to_str()
-                .ok_or(READ_FILENAME_ERROR)?
-                .to_string();
-
-            use std::convert::TryInto;
-            let file_size = std::fs::metadata(path)?.len().try_into()?;
-            state.progress.start(file_size);
-
-            let mut file = std::fs::File::open(path)?;
-            const BLOCK: usize = 65536;
-            let mut data = [0; BLOCK];
-
-            loop {
-                match file.read(&mut data) {
-                    Ok(bytes_read) => {
-                        state.progress.advance(bytes_read);
-                        let data_to_send = data[..bytes_read].to_vec();
-
-                        self.network
-                            .send_all(
-                                state.all_user_endpoints(),
-                                NetMessage::UserData(
-                                    file_name.clone(),
-                                    Some((data_to_send, bytes_read)),
-                                    None,
-                                ),
-                            )
-                            .map_err(stringify_sendall_errors)?;
-
-                        // done
-                        if bytes_read == 0 {
-                            let msg = format!("Successfully sent file {} !", file_name);
-                            let msg = LogMessage::new("Termchat".into(), MessageType::Content(msg));
-                            state.add_message(msg);
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        state.progress.done();
-
-                        self.network
-                            .send_all(
-                                state.all_user_endpoints(),
-                                NetMessage::UserData(file_name, None, Some(e.to_string())),
-                            )
-                            .map_err(stringify_sendall_errors)?;
-                        return Err(e.into());
-                    }
-                }
-                ui::draw(&mut self.terminal, &state)?;
-            }
-            state.progress.done();
-            ui::draw(&mut self.terminal, &state)?;
-        }
-        Ok(())
-    }
 }
 
 impl Drop for Application {
@@ -370,22 +315,4 @@ fn clean_terminal() {
             "termchat paniced, to log the error you can redirect stderror to a file, example: `termchat 2>termchat_log`"
         );
     }
-}
-
-fn termchat_error_message(e: String) -> LogMessage {
-    LogMessage::new(String::from("Termchat: "), MessageType::Error(e))
-}
-
-fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
-    let mut out = String::new();
-    for (endpoint, error) in e {
-        let msg = format!("Failed to connect to {}, error: {}", endpoint, error);
-        out.push_str(&msg);
-        out.push('\n');
-    }
-    // remove last new line
-    if !out.is_empty() {
-        out.pop();
-    }
-    out
 }

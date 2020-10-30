@@ -4,11 +4,19 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
+use crate::util::{Progress, ProgressState};
+
 pub enum MessageType {
     Connection,
     Disconnection,
     Content(String),
-    Error(String),
+    Termchat(String, TermchatMessageType),
+}
+
+#[derive(PartialEq)]
+pub enum TermchatMessageType {
+    Error,
+    Notification,
 }
 
 pub struct LogMessage {
@@ -38,31 +46,6 @@ pub struct ApplicationState {
     pub progress: Progress,
 }
 
-pub struct Progress {
-    max: usize,
-    current: usize,
-    state: ProgressState,
-}
-enum ProgressState {
-    Idle,
-    Working,
-    Done,
-}
-
-impl Progress {
-    pub fn start(&mut self, max: usize) {
-        self.state = ProgressState::Working;
-        self.max = max;
-    }
-    pub fn advance(&mut self, n: usize) {
-        self.current += n;
-    }
-    pub fn done(&mut self) {
-        self.state = ProgressState::Done;
-        self.current = 0;
-    }
-}
-
 pub enum CursorMovement {
     Left,
     Right,
@@ -86,11 +69,7 @@ impl ApplicationState {
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
             last_user_id: 0,
-            progress: Progress {
-                max: 0,
-                current: 0,
-                state: ProgressState::Idle,
-            },
+            progress: Progress::default(),
         }
     }
 

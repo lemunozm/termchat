@@ -1,4 +1,4 @@
-use super::state::{ApplicationState, MessageType};
+use super::state::{ApplicationState, MessageType, TermchatMessageType};
 use super::util::split_each;
 use crate::util::Result;
 
@@ -64,31 +64,24 @@ fn draw_messages_panel(
                     ui_message.extend(parse_content(content));
                     Spans::from(ui_message)
                 }
-                MessageType::Error(error) => Spans::from(vec![
-                    Span::styled(date, Style::default().fg(Color::DarkGray)),
-                    Span::styled(&message.user, Style::default().fg(Color::Red)),
-                    Span::styled(error, Style::default().fg(Color::LightRed)),
-                ]),
+                MessageType::Termchat(content, msg_type) => {
+                    let (user_color, content_color) = match msg_type {
+                        TermchatMessageType::Notification => (Color::Yellow, Color::LightYellow),
+                        TermchatMessageType::Error => (Color::Red, Color::LightRed),
+                    };
+                    Spans::from(vec![
+                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(&message.user, Style::default().fg(user_color)),
+                        Span::styled(content, Style::default().fg(content_color)),
+                    ])
+                }
             }
         })
         .collect::<Vec<_>>();
 
-    if let Some((current, max)) = state.progress() {
-        let color = Color::Red;
-
-        let width = chunk.width - 20;
-        let ui_step = width as f32 / max as f32;
-        let ui_current = (current as f32 * ui_step) as usize;
-        let ui_remaining = ((max.saturating_sub(current)) as f32 * ui_step) as usize;
-
-        let current: String = std::iter::repeat("#").take(ui_current).collect();
-        let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
-        let msg = format!("[{}{}]", current, remaining);
-        let ui_message = vec![
-            Span::styled("Termchat: ", Style::default().fg(color)),
-            Span::styled(msg, Style::default().fg(color)),
-        ];
-        messages.insert(0, Spans::from(ui_message));
+    // check if there is a file being sent and if so draw the progress bar
+    if let Some(progress) = state.progress() {
+        add_progress_bar(&mut messages, chunk.width, progress);
     }
 
     let messages_panel = Paragraph::new(messages)
@@ -104,22 +97,46 @@ fn draw_messages_panel(
     frame.render_widget(messages_panel, chunk);
 }
 
-fn parse_content<'a>(content: &'a str) -> Vec<Span<'a>> {
-    const SEND_COMMAND: &str = "?send";
+fn add_progress_bar(messages: &mut Vec<Spans>, panel_width: u16, progress: (usize, usize)) {
+    let (current, max) = progress;
+    let color = Color::LightGreen;
 
-    if content.starts_with(SEND_COMMAND) {
+    let width = panel_width - 20;
+    let ui_step = width as f32 / max as f32;
+    let ui_current = (current as f32 * ui_step) as usize;
+    let ui_remaining = ((max.saturating_sub(current)) as f32 * ui_step) as usize;
+
+    let current: String = std::iter::repeat("#").take(ui_current).collect();
+    let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
+    let msg = format!("[{}{}]", current, remaining);
+    let ui_message = vec![
+        Span::styled("Sending: ", Style::default().fg(color)),
+        Span::styled(msg, Style::default().fg(color)),
+    ];
+    messages.insert(0, Spans::from(ui_message));
+}
+
+fn parse_content(content: &str) -> Vec<Span> {
+    let color_command = |command| {
         content
-            .splitn(2, SEND_COMMAND)
+            .splitn(2, command)
             .enumerate()
             .map(|(index, part)| {
                 // ?send
                 if index == 0 {
-                    Span::styled(SEND_COMMAND, Style::default().fg(Color::LightYellow))
+                    Span::styled(command, Style::default().fg(Color::LightYellow))
                 } else {
                     Span::raw(part)
                 }
             })
             .collect()
+    };
+
+    const SEND_COMMAND: &str = "?send";
+
+    if content.starts_with(SEND_COMMAND) {
+        color_command(SEND_COMMAND)
+    // other commands can be handled here the same way
     } else {
         vec![Span::raw(content)]
     }
