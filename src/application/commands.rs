@@ -37,7 +37,7 @@ impl Application {
 
         let mut leftover = vec![];
 
-        loop {
+        let send_result = loop {
             match file.read(&mut data) {
                 Ok(bytes_read) => {
                     state.progress.advance(bytes_read);
@@ -59,19 +59,17 @@ impl Application {
                         let msg = format!("Successfully sent file {} !", file_name);
                         let msg = termchat_message(msg, TermchatMessageType::Notification);
                         state.add_message(msg);
-                        break;
+                        break Ok(());
                     }
                 }
                 Err(e) => {
-                    state.progress.done();
-
                     self.network
                         .send_all(
                             state.all_user_endpoints(),
                             NetMessage::UserData(file_name, None, Some(e.to_string())),
                         )
                         .map_err(stringify_sendall_errors)?;
-                    return Err(e.into());
+                    break Err(e.into());
                 }
             }
             ui::draw(&mut self.terminal, &state)?;
@@ -96,14 +94,14 @@ impl Application {
                             NetMessage::UserData(file_name, None, Some("User aborted.".into())),
                         )
                         .map_err(stringify_sendall_errors)?;
-                    break;
+                    break Ok(());
                 }
                 Some(ev) => {
                     leftover.push(ev);
                 }
                 None => (),
             }
-        }
+        };
 
         state.progress.done();
         ui::draw(&mut self.terminal, &state)?;
@@ -111,6 +109,7 @@ impl Application {
         for ev in leftover.into_iter().rev() {
             self.event_queue.sender().send(ev);
         }
-        Ok(())
+
+        send_result
     }
 }
