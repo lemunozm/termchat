@@ -35,6 +35,8 @@ impl Application {
         const BLOCK: usize = 65536;
         let mut data = [0; BLOCK];
 
+        let mut leftover = vec![];
+
         loop {
             match file.read(&mut data) {
                 Ok(bytes_read) => {
@@ -74,28 +76,41 @@ impl Application {
             }
             ui::draw(&mut self.terminal, &state)?;
             // check for ctrl_c
-            if let Some(Event::Terminal(TermEvent::Key(KeyEvent {
-                code: KeyCode::Char('c'),
-                modifiers: KeyModifiers::CONTROL,
-            }))) = self
+            match self
                 .event_queue
                 .receive_event_timeout(std::time::Duration::from_millis(100))
             {
-                let message =
-                    termchat_message("File not sent.".into(), TermchatMessageType::Notification);
-                state.add_message(message);
+                Some(Event::Terminal(TermEvent::Key(KeyEvent {
+                    code: KeyCode::Char('c'),
+                    modifiers: KeyModifiers::CONTROL,
+                }))) => {
+                    let message = termchat_message(
+                        "File not sent.".into(),
+                        TermchatMessageType::Notification,
+                    );
+                    state.add_message(message);
 
-                self.network
-                    .send_all(
-                        state.all_user_endpoints(),
-                        NetMessage::UserData(file_name, None, Some("User aborted.".into())),
-                    )
-                    .map_err(stringify_sendall_errors)?;
-                break;
+                    self.network
+                        .send_all(
+                            state.all_user_endpoints(),
+                            NetMessage::UserData(file_name, None, Some("User aborted.".into())),
+                        )
+                        .map_err(stringify_sendall_errors)?;
+                    break;
+                }
+                Some(ev) => {
+                    leftover.push(ev);
+                }
+                None => (),
             }
         }
+
         state.progress.done();
         ui::draw(&mut self.terminal, &state)?;
+
+        for ev in leftover.into_iter().rev() {
+            self.event_queue.sender().send(ev);
+        }
         Ok(())
     }
 }
