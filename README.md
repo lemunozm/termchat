@@ -57,7 +57,13 @@ You can set a custom tcp sever port with `-t <port>`
 
 (see the application help for more info `--help`).
 
-## Frequently Asked Questions
+### Commands
+Termchat treats messages containings the following commands in a special way:
+
+- **?send** *<$path_to_file>* **->** sends the specified file to everyone on the network, exp: `?send ./myfile`
+
+
+**Frequently Asked Questions**
 
 ***Q:*** **Hosts are not disoverable**
 

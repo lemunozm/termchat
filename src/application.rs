@@ -1,7 +1,9 @@
-use super::state::{ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement};
+use super::state::{
+    ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement, TermchatMessageType,
+};
 use super::terminal_events::TerminalEventCollector;
 use super::ui::{self};
-use crate::util::{Error, Result};
+use crate::util::{stringify_sendall_errors, termchat_message, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{
@@ -20,11 +22,14 @@ use serde::{Deserialize, Serialize};
 use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
+mod commands;
+
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
     HelloLan(String, u16), // user_name, server_port
     HelloUser(String),     // user_name
     UserMessage(String),   // content
+    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
 }
 
 enum Event {
@@ -115,10 +120,8 @@ impl Application {
                                     Ok(())
                                 };
                                 if let Err(e) = try_connect() {
-                                    let message = LogMessage::new(
-                                        String::from("termchat :"),
-                                        MessageType::Error(e.to_string()),
-                                    );
+                                    let message =
+                                        termchat_message(e.to_string(), TermchatMessageType::Error);
                                     state.add_message(message);
                                 }
                             }
@@ -132,6 +135,67 @@ impl Application {
                                 let message =
                                     LogMessage::new(user.into(), MessageType::Content(content));
                                 state.add_message(message);
+                            }
+                        }
+                        NetMessage::UserData(file_name, maybe_data, maybe_error) => {
+                            use std::io::Write;
+                            if state.user_name(endpoint).is_some() {
+                                // safe unwrap due to check
+                                let user = state.user_name(endpoint).unwrap().to_owned();
+
+                                let try_write = || -> Result<()> {
+                                    if let Some(error) = maybe_error {
+                                        return Err(format!(
+                                            "{} encountred an error while sending {}, error: {}",
+                                            user, file_name, error
+                                        )
+                                        .into());
+                                    }
+                                    // if the error is none we know that maybe_data is some
+                                    let (data, bytes_read) = maybe_data.unwrap();
+
+                                    //done
+                                    if bytes_read == 0 {
+                                        let msg = format!(
+                                            "Successfully received file {} from user {} !",
+                                            file_name, user
+                                        );
+                                        let msg = termchat_message(
+                                            msg,
+                                            TermchatMessageType::Notification,
+                                        );
+                                        state.add_message(msg);
+                                        return Ok(());
+                                    }
+
+                                    let path = std::env::temp_dir().join("termchat");
+                                    let user_path = path.join(&user);
+                                    // Ignore already exists error
+                                    let _ = std::fs::create_dir_all(&user_path);
+                                    let file_path = user_path.join(file_name);
+
+                                    let mut file = std::fs::OpenOptions::new()
+                                        .create(true)
+                                        .append(true)
+                                        .open(file_path)?;
+                                    file.write_all(&data)?;
+                                    Ok(())
+                                };
+
+                                if let Err(e) = try_write() {
+                                    let message = format!(
+                                        "termchat: Failed to write data sent from user: {}",
+                                        user
+                                    );
+                                    state.add_message(termchat_message(
+                                        message,
+                                        TermchatMessageType::Error,
+                                    ));
+                                    state.add_message(termchat_message(
+                                        e.to_string(),
+                                        TermchatMessageType::Error,
+                                    ));
+                                }
                             }
                         }
                     },
@@ -162,18 +226,25 @@ impl Application {
                                     state.all_user_endpoints(),
                                     NetMessage::UserMessage(input.clone()),
                                 ) {
-                                    LogMessage::new(
-                                        String::from("termchat :"),
-                                        MessageType::Error(format_errors(e)),
+                                    termchat_message(
+                                        stringify_sendall_errors(e),
+                                        TermchatMessageType::Error,
                                     )
                                 } else {
                                     LogMessage::new(
                                         format!("{} (me)", self.user_name),
-                                        MessageType::Content(input),
+                                        MessageType::Content(input.clone()),
                                     )
                                 };
 
                                 state.add_message(message);
+
+                                if let Err(parse_error) = self.parse_input(&input, &mut state) {
+                                    state.add_message(termchat_message(
+                                        parse_error.to_string(),
+                                        TermchatMessageType::Error,
+                                    ));
+                                }
                             }
                         }
                         KeyCode::Delete => {
@@ -244,18 +315,4 @@ fn clean_terminal() {
             "termchat paniced, to log the error you can redirect stderror to a file, example: `termchat 2>termchat_log`"
         );
     }
-}
-
-fn format_errors(e: Vec<(message_io::network::Endpoint, io::Error)>) -> String {
-    let mut out = String::new();
-    for (endpoint, error) in e {
-        let msg = format!("Failed to connect to {}, error: {}", endpoint, error);
-        out.push_str(&msg);
-        out.push('\n');
-    }
-    // remove last new line
-    if !out.is_empty() {
-        out.pop();
-    }
-    out
 }
