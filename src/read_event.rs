@@ -1,12 +1,12 @@
 use crate::util::Result;
-use std::sync::mpsc;
+use std::sync::Arc;
 
-type CallBack = Box<dyn Fn(Result<Chunk>) + Send>;
+type CallBack = Box<dyn Fn(Result<Chunk>) + Send + Sync>;
 
 pub struct ReadFile {
-    f: Option<CallBack>,
-    tx: mpsc::Sender<CallBack>,
-    rx: mpsc::Receiver<CallBack>,
+    f: Arc<CallBack>,
+    // tx: mpsc::Sender<CallBack>,
+    // rx: mpsc::Receiver<CallBack>,
 }
 
 pub struct Chunk {
@@ -18,18 +18,11 @@ pub struct Chunk {
 
 impl ReadFile {
     pub fn new(f: CallBack) -> Self {
-        let (tx, rx) = mpsc::channel();
-        Self { f: Some(f), tx, rx }
+        Self { f: Arc::new(f) }
     }
 
     pub fn send(&mut self, file_name: String, path: std::path::PathBuf) {
-        if let Ok(f) = self.rx.try_recv() {
-            assert!(self.f.is_none());
-            self.f = Some(f);
-        }
-        assert!(self.f.is_some());
-        let f = self.f.take().unwrap();
-        let tx = self.tx.clone();
+        let f = self.f.clone();
 
         std::thread::spawn(move || {
             use std::io::Read;
@@ -42,7 +35,7 @@ impl ReadFile {
             const BLOCK: usize = 65536;
             let mut data = [0; BLOCK];
 
-            let f = loop {
+            loop {
                 match file.read(&mut data) {
                     Ok(bytes_read) => {
                         let chunk = Chunk {
@@ -53,16 +46,15 @@ impl ReadFile {
                         };
                         f(Ok(chunk));
                         if bytes_read == 0 {
-                            break f;
+                            break;
                         }
                     }
                     Err(e) => {
                         f(Err(e.into()));
-                        break f;
+                        break;
                     }
                 }
-            };
-            tx.send(f).unwrap();
+            }
         });
     }
 }

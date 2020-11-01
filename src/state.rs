@@ -212,33 +212,14 @@ impl ApplicationState {
     }
 
     pub fn progress_start(&mut self) {
-        // stop the last progress
-        if let Some(current_progress) = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))) {
-        if let MessageType::Progress(ProgressState::Working(_file_size, _)) =
-            current_progress.message_type
-        {
-            // current_progress.message_type =
-            //     MessageType::Progress(ProgressState::Stopped(file_size));
-            // TODO
-            // handle sending multiple files at the same time
-            return
-        }
-        }
-
         self.messages.push(LogMessage::new(
             "Sending".into(),
             MessageType::Progress(ProgressState::Started),
         ))
     }
+
     pub fn progress_pulse(&mut self, file_size: usize, bytes_read: usize) {
-        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
-        if current_progress.is_none() {
-            //TODO
-            // this shouldnt happen
-            // needs to be handled
-            return;
-        }
-        let current_progress = current_progress.unwrap();
+        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))).unwrap();
 
         match current_progress.message_type {
             MessageType::Progress(ProgressState::Started) => {
