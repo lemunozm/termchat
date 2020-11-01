@@ -23,8 +23,9 @@ impl Application {
             .ok_or(READ_FILENAME_ERROR)?
             .to_string();
 
-        self.read_file_ev.send(file_name, path.to_path_buf());
-        state.progress_start();
+        self.read_file_ev
+            .send(file_name.clone(), path.to_path_buf());
+        state.progress_start(file_name);
         Ok(())
     }
 }

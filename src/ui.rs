@@ -1,4 +1,4 @@
-use super::state::{ApplicationState, MessageType, ProgressState, TermchatMessageType};
+use super::state::{progress::ProgressState, ApplicationState, MessageType, TermchatMessageType};
 use super::util::{split_each, Result};
 
 use tui::backend::CrosstermBackend;
@@ -94,8 +94,8 @@ fn draw_messages_panel(
 
 fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
     let (title, current, max) = match progress {
-        ProgressState::Started => ("Sending: ", 0, 0),
-        ProgressState::Working(max, current) => ("Sending: ", *current, *max),
+        ProgressState::Started(_) => ("Pending: ", 0, 0),
+        ProgressState::Working(_, max, current) => ("Sending: ", *current, *max),
         ProgressState::Stopped(max) => ("Done! ", *max, *max),
     };
 

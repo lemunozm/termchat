@@ -4,19 +4,15 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
+pub mod progress;
+use progress::ProgressState;
+
 pub enum MessageType {
     Connection,
     Disconnection,
     Content(String),
     Termchat(String, TermchatMessageType),
     Progress(ProgressState),
-}
-
-#[derive(PartialEq)]
-pub enum ProgressState {
-    Started,
-    Working(usize, usize),
-    Stopped(usize),
 }
 
 #[derive(PartialEq)]
@@ -209,65 +205,5 @@ impl ApplicationState {
 
     pub fn add_message(&mut self, message: LogMessage) {
         self.messages.push(message);
-    }
-
-    pub fn progress_start(&mut self) {
-        self.messages.push(LogMessage::new(
-            "Sending".into(),
-            MessageType::Progress(ProgressState::Started),
-        ))
-    }
-
-    pub fn progress_pulse(&mut self, file_size: usize, bytes_read: usize) {
-        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
-        let current_progress = match current_progress {
-            Some(p) => p,
-            None => {
-                // TODO
-                // Handle this case
-                // Happens when:
-                // - api is used incorrectly
-                // - multiple files are being sent
-                return;
-            }
-        };
-
-        match current_progress.message_type {
-            MessageType::Progress(ProgressState::Started) => {
-                current_progress.message_type =
-                    MessageType::Progress(ProgressState::Working(file_size, bytes_read));
-            }
-            // same file_size
-            MessageType::Progress(ProgressState::Working(_, current_bytes)) => {
-                current_progress.message_type = MessageType::Progress(ProgressState::Working(
-                    file_size,
-                    current_bytes + bytes_read,
-                ));
-            }
-            _ => unreachable!(),
-        }
-    }
-    pub fn progress_stop(&mut self) {
-        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
-        let current_progress = match current_progress {
-            Some(p) => p,
-            None => {
-                // TODO
-                // Handle this case
-                // Happens when:
-                // - api is used incorrectly
-                // - multiple files are being sent
-                return;
-            }
-        };
-
-        if let MessageType::Progress(ProgressState::Working(_, current_bytes)) =
-            current_progress.message_type
-        {
-            current_progress.message_type =
-                MessageType::Progress(ProgressState::Stopped(current_bytes));
-        } else {
-            unreachable!();
-        }
     }
 }

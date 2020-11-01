@@ -128,20 +128,26 @@ impl Application {
                         self.network
                             .send_all(
                                 state.all_user_endpoints(),
-                                NetMessage::UserData(file_name, Some((data, bytes_read)), None),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data, bytes_read)),
+                                    None,
+                                ),
                             )
                             .map_err(stringify_sendall_errors)?;
 
                         if bytes_read == 0 {
-                            state.progress_stop();
+                            state.progress_stop(file_name);
                         } else {
-                            state.progress_pulse(file_size, bytes_read);
+                            state.progress_pulse(file_name, file_size, bytes_read);
                         }
                         Ok(())
                     };
 
                     if let Err(e) = try_send() {
-                        state.progress_stop();
+                        // we dont have the file_name here
+                        // we'll just stop the last progress
+                        state.progress_stop_last();
                         let msg = format!("Error sending file. error: {}", e);
                         state.add_message(termchat_message(msg, TermchatMessageType::Error));
                     }
