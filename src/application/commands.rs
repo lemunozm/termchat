@@ -1,6 +1,6 @@
 use super::Event;
 use super::{stringify_sendall_errors, Application, NetMessage};
-use crate::state::{ApplicationState, LogMessage, MessageType, TermchatMessageType};
+use crate::state::{ApplicationState, TermchatMessageType};
 use crate::ui;
 use crate::util::{termchat_message, Result};
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -55,7 +55,7 @@ impl Application {
                     // done
                     if bytes_read == 0 {
                         let msg = format!("Successfully sent file {} !", file_name);
-                        let msg = LogMessage::new("Termchat".into(), MessageType::Content(msg));
+                        let msg = termchat_message(msg, TermchatMessageType::Notification);
                         state.add_message(msg);
                         break;
                     }
