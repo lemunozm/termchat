@@ -25,12 +25,22 @@ impl ReadFile {
         let f = self.f.clone();
 
         std::thread::spawn(move || {
+            use std::convert::TryInto;
             use std::io::Read;
 
-            use std::convert::TryInto;
-            let file_size = std::fs::metadata(&path).unwrap().len().try_into().unwrap();
+            let try_read = || -> Result<(std::fs::File, usize)> {
+                let file_size = std::fs::metadata(&path)?.len().try_into()?;
+                let file = std::fs::File::open(path)?;
+                Ok((file, file_size))
+            };
 
-            let mut file = std::fs::File::open(path).unwrap();
+            let (mut file, file_size) = match try_read() {
+                Ok((file, file_size)) => (file, file_size),
+                Err(e) => {
+                    f(Err(e));
+                    return;
+                }
+            };
 
             const BLOCK: usize = 65536;
             let mut data = [0; BLOCK];

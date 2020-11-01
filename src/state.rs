@@ -219,7 +219,18 @@ impl ApplicationState {
     }
 
     pub fn progress_pulse(&mut self, file_size: usize, bytes_read: usize) {
-        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))).unwrap();
+        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
+        let current_progress = match current_progress {
+            Some(p) => p,
+            None => {
+                //TODO
+                //Handle this case
+                // Happens when:
+                // - api is used incorrectly
+                // - multiple files are being sent
+                return;
+            }
+        };
 
         match current_progress.message_type {
             MessageType::Progress(ProgressState::Started) => {
@@ -237,12 +248,24 @@ impl ApplicationState {
         }
     }
     pub fn progress_stop(&mut self) {
-        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))).unwrap();
-        if let MessageType::Progress(ProgressState::Working(file_size, _)) =
+        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
+        let current_progress = match current_progress {
+            Some(p) => p,
+            None => {
+                //TODO
+                //Handle this case
+                // Happens when:
+                // - api is used incorrectly
+                // - multiple files are being sent
+                return;
+            }
+        };
+
+        if let MessageType::Progress(ProgressState::Working(_, current_bytes)) =
             current_progress.message_type
         {
             current_progress.message_type =
-                MessageType::Progress(ProgressState::Stopped(file_size));
+                MessageType::Progress(ProgressState::Stopped(current_bytes));
         } else {
             unreachable!();
         }

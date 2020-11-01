@@ -117,25 +117,35 @@ impl Application {
         loop {
             match self.event_queue.receive() {
                 Event::ReadFile(chunk) => {
-                    let Chunk {
-                        file_name,
-                        data,
-                        bytes_read,
-                        file_size,
-                    } = chunk.unwrap();
+                    let try_send = || -> Result<()> {
+                        let Chunk {
+                            file_name,
+                            data,
+                            bytes_read,
+                            file_size,
+                        } = chunk?;
 
-                    self.network
-                        .send_all(
-                            state.all_user_endpoints(),
-                            NetMessage::UserData(file_name, Some((data, bytes_read)), None),
-                        )
-                        .unwrap();
+                        self.network
+                            .send_all(
+                                state.all_user_endpoints(),
+                                NetMessage::UserData(file_name, Some((data, bytes_read)), None),
+                            )
+                            .map_err(stringify_sendall_errors)?;
 
-                    if bytes_read == 0 {
+                        if bytes_read == 0 {
+                            state.progress_stop();
+                        } else {
+                            state.progress_pulse(file_size, bytes_read);
+                        }
+                        Ok(())
+                    };
+
+                    if let Err(e) = try_send() {
                         state.progress_stop();
-                    } else {
-                        state.progress_pulse(file_size, bytes_read);
+                        let msg = format!("Error sending file. error: {}", e);
+                        state.add_message(termchat_message(msg, TermchatMessageType::Error));
                     }
+
                     ui::draw(&mut self.terminal, &state)?;
                 }
                 Event::Network(net_event) => match net_event {
