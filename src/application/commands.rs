@@ -1,7 +1,9 @@
+use super::Event;
 use super::{stringify_sendall_errors, Application, NetMessage};
 use crate::state::{ApplicationState, LogMessage, MessageType};
 use crate::ui;
 use crate::util::Result;
+use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 impl Application {
     pub fn parse_input(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
@@ -71,6 +73,22 @@ impl Application {
                 }
             }
             ui::draw(&mut self.terminal, &state)?;
+            // check for ctrl_c
+            if let Some(Event::Terminal(TermEvent::Key(KeyEvent {
+                code: KeyCode::Char('c'),
+                modifiers: KeyModifiers::CONTROL,
+            }))) = self
+                .event_queue
+                .receive_event_timeout(std::time::Duration::from_millis(100))
+            {
+                self.network
+                    .send_all(
+                        state.all_user_endpoints(),
+                        NetMessage::UserData(file_name, None, Some("User aborted.".into())),
+                    )
+                    .map_err(stringify_sendall_errors)?;
+                break;
+            }
         }
         state.progress.done();
         ui::draw(&mut self.terminal, &state)?;
