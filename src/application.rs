@@ -23,6 +23,7 @@ use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
 mod commands;
+use crate::read_event::{Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
@@ -35,6 +36,7 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
+    ReadFile(Result<Chunk>),
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
@@ -44,6 +46,7 @@ pub struct Application {
     event_queue: EventQueue<Event>,
     network: NetworkManager,
     terminal: Terminal<CrosstermBackend<Stdout>>,
+    read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
@@ -62,13 +65,19 @@ impl Application {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
+        let network = NetworkManager::new(move |net_event| {
+            sender.send_with_priority(Event::Network(net_event))
+        });
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
-            Ok(event) => sender.send(Event::Terminal(event)),
+            Ok(event) => sender.send_with_priority(Event::Terminal(event)),
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
+
+        let sender = event_queue.sender().clone(); // Collect read_file events
+        let read_file_ev =
+            ReadFile::new(Box::new(move |chunk| sender.send(Event::ReadFile(chunk))));
 
         terminal::enable_raw_mode()?;
         io::stdout().execute(terminal::EnterAlternateScreen)?;
@@ -82,6 +91,7 @@ impl Application {
             event_queue,
             network,
             terminal,
+            read_file_ev,
             // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
             discovery_addr,
@@ -106,6 +116,28 @@ impl Application {
 
         loop {
             match self.event_queue.receive() {
+                Event::ReadFile(chunk) => {
+                    let Chunk {
+                        file_name,
+                        data,
+                        bytes_read,
+                        file_size,
+                    } = chunk.unwrap();
+
+                    self.network
+                        .send_all(
+                            state.all_user_endpoints(),
+                            NetMessage::UserData(file_name, Some((data, bytes_read)), None),
+                        )
+                        .unwrap();
+
+                    if bytes_read == 0 {
+                        state.progress_stop();
+                    } else {
+                        state.progress_pulse(file_size, bytes_read);
+                    }
+                    ui::draw(&mut self.terminal, &state)?;
+                }
                 Event::Network(net_event) => match net_event {
                     NetEvent::Message(endpoint, message) => match message {
                         // by udp (multicast):

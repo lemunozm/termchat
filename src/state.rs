@@ -4,13 +4,19 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
-use crate::util::{Progress, ProgressState};
-
 pub enum MessageType {
     Connection,
     Disconnection,
     Content(String),
     Termchat(String, TermchatMessageType),
+    Progress(ProgressState),
+}
+
+#[derive(PartialEq)]
+pub enum ProgressState {
+    Started,
+    Working(usize, usize),
+    Stopped(usize),
 }
 
 #[derive(PartialEq)]
@@ -43,7 +49,6 @@ pub struct ApplicationState {
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
     last_user_id: usize,
-    pub progress: Progress,
 }
 
 pub enum CursorMovement {
@@ -69,7 +74,6 @@ impl ApplicationState {
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
             last_user_id: 0,
-            progress: Progress::default(),
         }
     }
 
@@ -207,11 +211,59 @@ impl ApplicationState {
         self.messages.push(message);
     }
 
-    pub fn progress(&self) -> Option<(usize, usize)> {
-        if let ProgressState::Working = self.progress.state {
-            Some((self.progress.current, self.progress.max))
+    pub fn progress_start(&mut self) {
+        // stop the last progress
+        if let Some(current_progress) = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))) {
+        if let MessageType::Progress(ProgressState::Working(_file_size, _)) =
+            current_progress.message_type
+        {
+            // current_progress.message_type =
+            //     MessageType::Progress(ProgressState::Stopped(file_size));
+            // TODO
+            // handle sending multiple files at the same time
+            return
+        }
+        }
+
+        self.messages.push(LogMessage::new(
+            "Sending".into(),
+            MessageType::Progress(ProgressState::Started),
+        ))
+    }
+    pub fn progress_pulse(&mut self, file_size: usize, bytes_read: usize) {
+        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_))));
+        if current_progress.is_none() {
+            //TODO
+            // this shouldnt happen
+            // needs to be handled
+            return;
+        }
+        let current_progress = current_progress.unwrap();
+
+        match current_progress.message_type {
+            MessageType::Progress(ProgressState::Started) => {
+                current_progress.message_type =
+                    MessageType::Progress(ProgressState::Working(file_size, bytes_read));
+            }
+            // same file_size
+            MessageType::Progress(ProgressState::Working(_, current_bytes)) => {
+                current_progress.message_type = MessageType::Progress(ProgressState::Working(
+                    file_size,
+                    current_bytes + bytes_read,
+                ));
+            }
+            _ => unreachable!(),
+        }
+    }
+    pub fn progress_stop(&mut self) {
+        let current_progress = self.messages.iter_mut().rfind(|m|matches!(m.message_type, MessageType::Progress(ProgressState::Started) |  MessageType::Progress(ProgressState::Working(_,_)))).unwrap();
+        if let MessageType::Progress(ProgressState::Working(file_size, _)) =
+            current_progress.message_type
+        {
+            current_progress.message_type =
+                MessageType::Progress(ProgressState::Stopped(file_size));
         } else {
-            None
+            unreachable!();
         }
     }
 }
