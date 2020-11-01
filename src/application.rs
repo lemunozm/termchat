@@ -187,11 +187,11 @@ impl Application {
                                         format!("Failed to write data sent from user: {}", user);
                                     state.add_message(termchat_message(
                                         message,
-                                        TermchatMessageType::Error,
+                                        TermchatMessageType::Notification,
                                     ));
                                     state.add_message(termchat_message(
                                         e.to_string(),
-                                        TermchatMessageType::Error,
+                                        TermchatMessageType::Notification,
                                     ));
                                 }
                             }
