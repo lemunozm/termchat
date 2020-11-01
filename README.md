@@ -1,3 +1,7 @@
+[![](https://img.shields.io/crates/v/termchat)](https://crates.io/crates/termchat)
+[![](https://img.shields.io/crates/l/termchat)](https://www.apache.org/licenses/LICENSE-2.0.txt)
+[![](https://img.shields.io/github/workflow/status/lemunozm/termchat/termchat%20ci)](https://github.com/lemunozm/termchat/actions?query=workflow%3A%22termchat+ci%22)
+
 <p align="center">
   <img src="https://docs.google.com/drawings/d/e/2PACX-1vTCUOY5x1FQ-zWJdagKPLVWLTWDO3QCg9brYPOHZ6qqK6LndPTDM3sfp0599w1F4VatZfLITTZM33JW/pub?w=712&h=164"/>
 </p>
@@ -51,23 +55,23 @@ to open the application in your terminal.
 
 By default, your computer user name is used. You can use a different username with `-u <name>`
 
-You can modify the multicast discovery address with `-d <address>` 
+You can modify the multicast discovery address with `-d <address>`
 
-You can set a custom tcp sever port with `-t <port>` 
+You can set a custom tcp sever port with `-t <port>`
 
 (see the application help for more info `--help`).
 
 ### Commands
 Termchat treats messages containings the following commands in a special way:
 
-- **?send** *<$path_to_file>* **->** sends the specified file to everyone on the network, exp: `?send ./myfile`
+- **`?send <$path_to_file>`**: sends the specified file to everyone on the network, exp: `?send ./myfile`
 
 
-**Frequently Asked Questions**
+## Frequently Asked Questions
 
 ***Q:*** **Hosts are not disoverable**
 
-***A:*** 
+***A:***
 
 - Make sure that no firewall is running (example: ufw), and if that's the case either stop it or add termchat ports to the white list.
 
