@@ -1,8 +1,8 @@
 use super::Event;
 use super::{stringify_sendall_errors, Application, NetMessage};
-use crate::state::{ApplicationState, LogMessage, MessageType};
+use crate::state::{ApplicationState, LogMessage, MessageType, TermchatMessageType};
 use crate::ui;
-use crate::util::Result;
+use crate::util::{termchat_message, Result};
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 impl Application {
@@ -81,6 +81,10 @@ impl Application {
                 .event_queue
                 .receive_event_timeout(std::time::Duration::from_millis(100))
             {
+                let message =
+                    termchat_message("File not sent.".into(), TermchatMessageType::Notification);
+                state.add_message(message);
+
                 self.network
                     .send_all(
                         state.all_user_endpoints(),

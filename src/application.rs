@@ -183,10 +183,8 @@ impl Application {
                                 };
 
                                 if let Err(e) = try_write() {
-                                    let message = format!(
-                                        "termchat: Failed to write data sent from user: {}",
-                                        user
-                                    );
+                                    let message =
+                                        format!("Failed to write data sent from user: {}", user);
                                     state.add_message(termchat_message(
                                         message,
                                         TermchatMessageType::Error,
