@@ -223,8 +223,8 @@ impl ApplicationState {
         let current_progress = match current_progress {
             Some(p) => p,
             None => {
-                //TODO
-                //Handle this case
+                // TODO
+                // Handle this case
                 // Happens when:
                 // - api is used incorrectly
                 // - multiple files are being sent
@@ -252,8 +252,8 @@ impl ApplicationState {
         let current_progress = match current_progress {
             Some(p) => p,
             None => {
-                //TODO
-                //Handle this case
+                // TODO
+                // Handle this case
                 // Happens when:
                 // - api is used incorrectly
                 // - multiple files are being sent

@@ -4,9 +4,7 @@ use std::sync::Arc;
 type CallBack = Box<dyn Fn(Result<Chunk>) + Send + Sync>;
 
 pub struct ReadFile {
-    f: Arc<CallBack>,
-    // tx: mpsc::Sender<CallBack>,
-    // rx: mpsc::Receiver<CallBack>,
+    callback: Arc<CallBack>,
 }
 
 pub struct Chunk {
@@ -17,12 +15,14 @@ pub struct Chunk {
 }
 
 impl ReadFile {
-    pub fn new(f: CallBack) -> Self {
-        Self { f: Arc::new(f) }
+    pub fn new(callback: CallBack) -> Self {
+        Self {
+            callback: Arc::new(callback),
+        }
     }
 
     pub fn send(&mut self, file_name: String, path: std::path::PathBuf) {
-        let f = self.f.clone();
+        let callback = self.callback.clone();
 
         std::thread::spawn(move || {
             use std::convert::TryInto;
@@ -37,7 +37,7 @@ impl ReadFile {
             let (mut file, file_size) = match try_read() {
                 Ok((file, file_size)) => (file, file_size),
                 Err(e) => {
-                    f(Err(e));
+                    callback(Err(e));
                     return;
                 }
             };
@@ -54,13 +54,13 @@ impl ReadFile {
                             bytes_read,
                             file_size,
                         };
-                        f(Ok(chunk));
+                        callback(Ok(chunk));
                         if bytes_read == 0 {
                             break;
                         }
                     }
                     Err(e) => {
-                        f(Err(e.into()));
+                        callback(Err(e.into()));
                         break;
                     }
                 }
