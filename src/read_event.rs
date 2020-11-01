@@ -8,6 +8,7 @@ pub struct ReadFile {
 }
 
 pub struct Chunk {
+    pub id: usize,
     pub file_name: String,
     pub data: Vec<u8>,
     pub bytes_read: usize,
@@ -21,7 +22,7 @@ impl ReadFile {
         }
     }
 
-    pub fn send(&mut self, file_name: String, path: std::path::PathBuf) {
+    pub fn send(&mut self, id: usize, file_name: String, path: std::path::PathBuf) {
         let callback = self.callback.clone();
 
         std::thread::spawn(move || {
@@ -49,6 +50,7 @@ impl ReadFile {
                 match file.read(&mut data) {
                     Ok(bytes_read) => {
                         let chunk = Chunk {
+                            id,
                             file_name: file_name.clone(),
                             data: data[..bytes_read].to_vec(),
                             bytes_read,

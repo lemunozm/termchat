@@ -51,6 +51,8 @@ pub struct Application {
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
     user_name: String,
+    // id is used to identify the progress of sent files
+    id: usize,
 }
 
 impl Application {
@@ -97,6 +99,7 @@ impl Application {
             discovery_addr,
             tcp_server_addr,
             user_name: user_name.into(),
+            id: 0,
         })
     }
 
@@ -119,6 +122,7 @@ impl Application {
                 Event::ReadFile(chunk) => {
                     let try_send = || -> Result<()> {
                         let Chunk {
+                            id,
                             file_name,
                             data,
                             bytes_read,
@@ -128,18 +132,14 @@ impl Application {
                         self.network
                             .send_all(
                                 state.all_user_endpoints(),
-                                NetMessage::UserData(
-                                    file_name.clone(),
-                                    Some((data, bytes_read)),
-                                    None,
-                                ),
+                                NetMessage::UserData(file_name, Some((data, bytes_read)), None),
                             )
                             .map_err(stringify_sendall_errors)?;
 
                         if bytes_read == 0 {
-                            state.progress_stop(file_name);
+                            state.progress_stop(id);
                         } else {
-                            state.progress_pulse(file_name, file_size, bytes_read);
+                            state.progress_pulse(id, file_size, bytes_read);
                         }
                         Ok(())
                     };
