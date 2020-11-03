@@ -151,8 +151,6 @@ impl Application {
                         let msg = format!("Error sending file. error: {}", e);
                         state.add_message(termchat_message(msg, TermchatMessageType::Error));
                     }
-
-                    ui::draw(&mut self.terminal, &state)?;
                 }
                 Event::Network(net_event) => match net_event {
                     NetEvent::Message(endpoint, message) => match message {
