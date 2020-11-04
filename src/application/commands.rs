@@ -23,7 +23,8 @@ impl Application {
             .ok_or(READ_FILENAME_ERROR)?
             .to_string();
 
-        let thread = self.read_file_ev
+        let thread = self
+            .read_file_ev
             .send(self.id, file_name, path.to_path_buf());
         self.send_threads.insert(self.id, thread);
 

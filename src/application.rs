@@ -69,13 +69,11 @@ impl Application {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = NetworkManager::new(move |net_event| {
-            sender.send_with_priority(Event::Network(net_event))
-        });
+        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
-            Ok(event) => sender.send_with_priority(Event::Terminal(event)),
+            Ok(event) => sender.send(Event::Terminal(event)),
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
