@@ -53,7 +53,9 @@ pub struct Application {
     user_name: String,
     // id is used to identify the progress of sent files
     id: usize,
+    send_threads: HashMap<usize, std::thread::JoinHandle<()>>,
 }
+use std::collections::HashMap;
 
 impl Application {
     pub fn new(
@@ -100,6 +102,7 @@ impl Application {
             tcp_server_addr,
             user_name: user_name.into(),
             id: 0,
+            send_threads: HashMap::new(),
         })
     }
 
@@ -141,6 +144,7 @@ impl Application {
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
                         }
+                        self.send_threads[&id].thread().unpark();
                         Ok(())
                     };
 

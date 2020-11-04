@@ -22,7 +22,7 @@ impl ReadFile {
         }
     }
 
-    pub fn send(&mut self, id: usize, file_name: String, path: std::path::PathBuf) {
+    pub fn send(&mut self, id: usize, file_name: String, path: std::path::PathBuf) -> std::thread::JoinHandle<()> {
         let callback = self.callback.clone();
 
         std::thread::spawn(move || {
@@ -66,7 +66,8 @@ impl ReadFile {
                         break;
                     }
                 }
+                std::thread::park();
             }
-        });
+        })
     }
 }
