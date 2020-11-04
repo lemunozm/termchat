@@ -19,6 +19,7 @@ use message_io::network::{NetEvent, NetworkManager};
 
 use serde::{Deserialize, Serialize};
 
+use std::collections::HashMap;
 use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
@@ -52,10 +53,27 @@ pub struct Application {
     tcp_server_addr: SocketAddr,
     user_name: String,
     // id is used to identify the progress of sent files
-    id: usize,
-    send_threads: HashMap<usize, std::thread::JoinHandle<()>>,
+    send_threads: SendThreads,
 }
-use std::collections::HashMap;
+
+/// Struct used to keep track of the threads that are sending files
+#[derive(Default)]
+struct SendThreads {
+    id: usize,
+    threads: HashMap<usize, std::thread::JoinHandle<()>>,
+}
+impl SendThreads {
+    fn get(&self, id: &usize) -> Option<&std::thread::JoinHandle<()>> {
+        self.threads.get(id)
+    }
+    fn insert(&mut self, thread: std::thread::JoinHandle<()>) {
+        self.threads.insert(self.id, thread);
+        self.id += 1;
+    }
+    fn free_id(&self) -> usize {
+        self.id
+    }
+}
 
 impl Application {
     pub fn new(
@@ -99,8 +117,7 @@ impl Application {
             discovery_addr,
             tcp_server_addr,
             user_name: user_name.into(),
-            id: 0,
-            send_threads: HashMap::new(),
+            send_threads: SendThreads::default(),
         })
     }
 
@@ -142,7 +159,9 @@ impl Application {
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
                         }
-                        self.send_threads[&id].thread().unpark();
+                        if let Some(handle) = self.send_threads.get(&id) {
+                            handle.thread().unpark();
+                        }
                         Ok(())
                     };
 
