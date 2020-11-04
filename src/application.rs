@@ -52,7 +52,6 @@ pub struct Application {
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
     user_name: String,
-    // id is used to identify the progress of sent files
     send_threads: SendThreads,
 }
 
