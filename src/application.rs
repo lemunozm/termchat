@@ -147,7 +147,6 @@ impl Application {
                             let sender = self.event_queue.sender().clone();
                             read_file(sender, file, file_name, file_size, id);
                         }
-                        //self.read_file_ev.tx.send(());
                         Ok(())
                     };
 
