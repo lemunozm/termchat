@@ -121,6 +121,7 @@ impl Application {
                 Event::ReadFile(chunk) => {
                     let try_send = || -> Result<()> {
                         let Chunk {
+                            file,
                             id,
                             file_name,
                             data,
@@ -131,7 +132,11 @@ impl Application {
                         self.network
                             .send_all(
                                 state.all_user_endpoints(),
-                                NetMessage::UserData(file_name, Some((data, bytes_read)), None),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data, bytes_read)),
+                                    None,
+                                ),
                             )
                             .map_err(stringify_sendall_errors)?;
 
@@ -139,6 +144,8 @@ impl Application {
                             state.progress_stop(id);
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
+                            let sender = self.event_queue.sender().clone();
+                            read_file(sender, file, file_name, file_size, id);
                         }
                         //self.read_file_ev.tx.send(());
                         Ok(())

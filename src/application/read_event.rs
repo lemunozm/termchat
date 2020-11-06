@@ -5,10 +5,10 @@ type CallBack = Box<dyn Fn(std::fs::File, String, usize, usize) + Send + Sync>;
 pub struct ReadFile {
     callback: CallBack,
     id: usize,
-    files: Vec<std::fs::File>,
 }
 
 pub struct Chunk {
+    pub file: std::fs::File,
     pub id: usize,
     pub file_name: String,
     pub data: Vec<u8>,
@@ -18,7 +18,7 @@ pub struct Chunk {
 
 impl ReadFile {
     pub fn new(callback: CallBack) -> Self {
-        Self { callback, id: 0}
+        Self { callback, id: 0 }
     }
 
     pub fn send(&mut self, file_name: String, path: std::path::PathBuf) -> Result<usize> {
@@ -58,21 +58,19 @@ pub fn read_file(
     const BLOCK: usize = 65536;
     let mut data = [0; BLOCK];
 
-        match file.read(&mut data) {
-            Ok(bytes_read) => {
-                let chunk = Chunk {
-                    id,
-                    file_name: file_name.clone(),
-                    data: data[..bytes_read].to_vec(),
-                    bytes_read,
-                    file_size,
-                };
-                sender.send(Event::ReadFile(Ok(chunk)));
-                if bytes_read == 0 {
-                }
-            }
-            Err(e) => {
-                sender.send(Event::ReadFile(Err(e.into())));
-            }
+    let res = match file.read(&mut data) {
+        Ok(bytes_read) => {
+            let chunk = Chunk {
+                file,
+                id,
+                file_name,
+                data: data[..bytes_read].to_vec(),
+                bytes_read,
+                file_size,
+            };
+            Event::ReadFile(Ok(chunk))
         }
+        Err(e) => Event::ReadFile(Err(e.into())),
+    };
+    sender.send(res);
 }
