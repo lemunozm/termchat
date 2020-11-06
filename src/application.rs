@@ -19,22 +19,23 @@ use message_io::network::{NetEvent, NetworkManager};
 
 use serde::{Deserialize, Serialize};
 
-use std::collections::HashMap;
 use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
 mod commands;
-use crate::read_event::{Chunk, ReadFile};
+mod read_event;
+
+use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
-enum NetMessage {
+pub enum NetMessage {
     HelloLan(String, u16), // user_name, server_port
     HelloUser(String),     // user_name
     UserMessage(String),   // content
     UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
 }
 
-enum Event {
+pub enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     ReadFile(Result<Chunk>),
@@ -52,26 +53,6 @@ pub struct Application {
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
     user_name: String,
-    send_threads: SendThreads,
-}
-
-/// Struct used to keep track of the threads that are sending files
-#[derive(Default)]
-struct SendThreads {
-    id: usize,
-    threads: HashMap<usize, std::thread::JoinHandle<()>>,
-}
-impl SendThreads {
-    fn get(&self, id: &usize) -> Option<&std::thread::JoinHandle<()>> {
-        self.threads.get(id)
-    }
-    fn insert(&mut self, thread: std::thread::JoinHandle<()>) {
-        self.threads.insert(self.id, thread);
-        self.id += 1;
-    }
-    fn free_id(&self) -> usize {
-        self.id
-    }
 }
 
 impl Application {
@@ -95,32 +76,9 @@ impl Application {
         })?;
 
         let sender = event_queue.sender().clone(); // Collect read_file events
-        let read_file_ev = ReadFile::new(Box::new(move |mut file, file_name, file_size, id| {
-            use std::io::Read;
-            const BLOCK: usize = 65536;
-            let mut data = [0; BLOCK];
-
-            loop {
-                match file.read(&mut data) {
-                    Ok(bytes_read) => {
-                        let chunk = Chunk {
-                            id,
-                            file_name: file_name.clone(),
-                            data: data[..bytes_read].to_vec(),
-                            bytes_read,
-                            file_size,
-                        };
-                        sender.send(Event::ReadFile(Ok(chunk)));
-                        if bytes_read == 0 {
-                            break;
-                        }
-                    }
-                    Err(e) => {
-                        sender.send(Event::ReadFile(Err(e.into())));
-                        break;
-                    }
-                }
-            }
+        let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
+            let sender = sender.clone();
+            read_file(sender, file, file_name, file_size, id)
         }));
 
         terminal::enable_raw_mode()?;
@@ -141,7 +99,6 @@ impl Application {
             discovery_addr,
             tcp_server_addr,
             user_name: user_name.into(),
-            send_threads: SendThreads::default(),
         })
     }
 
@@ -183,9 +140,7 @@ impl Application {
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
                         }
-                        if let Some(handle) = self.send_threads.get(&id) {
-                            handle.thread().unpark();
-                        }
+                        //self.read_file_ev.tx.send(());
                         Ok(())
                     };
 
