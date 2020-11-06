@@ -95,8 +95,33 @@ impl Application {
         })?;
 
         let sender = event_queue.sender().clone(); // Collect read_file events
-        let read_file_ev =
-            ReadFile::new(Box::new(move |chunk| sender.send(Event::ReadFile(chunk))));
+        let read_file_ev = ReadFile::new(Box::new(move |mut file, file_name, file_size, id| {
+            use std::io::Read;
+            const BLOCK: usize = 65536;
+            let mut data = [0; BLOCK];
+
+            loop {
+                match file.read(&mut data) {
+                    Ok(bytes_read) => {
+                        let chunk = Chunk {
+                            id,
+                            file_name: file_name.clone(),
+                            data: data[..bytes_read].to_vec(),
+                            bytes_read,
+                            file_size,
+                        };
+                        sender.send(Event::ReadFile(Ok(chunk)));
+                        if bytes_read == 0 {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        sender.send(Event::ReadFile(Err(e.into())));
+                        break;
+                    }
+                }
+            }
+        }));
 
         terminal::enable_raw_mode()?;
         io::stdout().execute(terminal::EnterAlternateScreen)?;
