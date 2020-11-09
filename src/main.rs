@@ -1,5 +1,4 @@
 mod application;
-mod read_event;
 mod state;
 mod terminal_events;
 mod ui;

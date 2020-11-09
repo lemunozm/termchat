@@ -23,11 +23,8 @@ impl Application {
             .ok_or(READ_FILENAME_ERROR)?
             .to_string();
 
-        self.read_file_ev
-            .send(self.id, file_name, path.to_path_buf());
-
-        state.progress_start(self.id);
-        self.id += 1;
+        let send_id = self.read_file_ev.send(file_name, path.to_path_buf())?;
+        state.progress_start(send_id);
 
         Ok(())
     }

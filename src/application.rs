@@ -23,17 +23,19 @@ use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
 mod commands;
-use crate::read_event::{Chunk, ReadFile};
+mod read_event;
+
+use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
-enum NetMessage {
+pub enum NetMessage {
     HelloLan(String, u16), // user_name, server_port
     HelloUser(String),     // user_name
     UserMessage(String),   // content
     UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
 }
 
-enum Event {
+pub enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     ReadFile(Result<Chunk>),
@@ -51,8 +53,6 @@ pub struct Application {
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
     user_name: String,
-    // id is used to identify the progress of sent files
-    id: usize,
 }
 
 impl Application {
@@ -67,19 +67,19 @@ impl Application {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = NetworkManager::new(move |net_event| {
-            sender.send_with_priority(Event::Network(net_event))
-        });
+        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
-            Ok(event) => sender.send_with_priority(Event::Terminal(event)),
+            Ok(event) => sender.send(Event::Terminal(event)),
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
         let sender = event_queue.sender().clone(); // Collect read_file events
-        let read_file_ev =
-            ReadFile::new(Box::new(move |chunk| sender.send(Event::ReadFile(chunk))));
+        let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
+            let sender = sender.clone();
+            read_file(sender, file, file_name, file_size, id)
+        }));
 
         terminal::enable_raw_mode()?;
         io::stdout().execute(terminal::EnterAlternateScreen)?;
@@ -99,7 +99,6 @@ impl Application {
             discovery_addr,
             tcp_server_addr,
             user_name: user_name.into(),
-            id: 0,
         })
     }
 
@@ -122,6 +121,7 @@ impl Application {
                 Event::ReadFile(chunk) => {
                     let try_send = || -> Result<()> {
                         let Chunk {
+                            file,
                             id,
                             file_name,
                             data,
@@ -132,7 +132,11 @@ impl Application {
                         self.network
                             .send_all(
                                 state.all_user_endpoints(),
-                                NetMessage::UserData(file_name, Some((data, bytes_read)), None),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data, bytes_read)),
+                                    None,
+                                ),
                             )
                             .map_err(stringify_sendall_errors)?;
 
@@ -140,6 +144,8 @@ impl Application {
                             state.progress_stop(id);
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
+                            let sender = self.event_queue.sender().clone();
+                            read_file(sender, file, file_name, file_size, id);
                         }
                         Ok(())
                     };
