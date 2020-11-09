@@ -24,18 +24,8 @@ impl ReadFile {
     pub fn send(&mut self, file_name: String, path: std::path::PathBuf) -> Result<usize> {
         use std::convert::TryInto;
 
-        let try_read = || -> Result<(std::fs::File, usize)> {
-            let file_size = std::fs::metadata(&path)?.len().try_into()?;
-            let file = std::fs::File::open(path)?;
-            Ok((file, file_size))
-        };
-
-        let (file, file_size) = match try_read() {
-            Ok((file, file_size)) => (file, file_size),
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        let file_size = std::fs::metadata(&path)?.len().try_into()?;
+        let file = std::fs::File::open(path)?;
 
         let send_id = self.id;
         (self.callback)(file, file_name, file_size, send_id);
@@ -45,20 +35,18 @@ impl ReadFile {
     }
 }
 
-use super::Event;
 pub fn read_file(
-    sender: message_io::events::EventSender<Event>,
     mut file: std::fs::File,
     file_name: String,
     file_size: usize,
     id: usize,
-) {
+) -> Result<Chunk> {
     use std::io::Read;
 
     const BLOCK: usize = 65536;
     let mut data = [0; BLOCK];
 
-    let res = match file.read(&mut data) {
+    match file.read(&mut data) {
         Ok(bytes_read) => {
             let chunk = Chunk {
                 file,
@@ -68,9 +56,8 @@ pub fn read_file(
                 bytes_read,
                 file_size,
             };
-            Event::ReadFile(Ok(chunk))
+            Ok(chunk)
         }
-        Err(e) => Event::ReadFile(Err(e.into())),
-    };
-    sender.send(res);
+        Err(e) => Err(e.into()),
+    }
 }

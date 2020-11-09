@@ -28,14 +28,14 @@ mod read_event;
 use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
-pub enum NetMessage {
+enum NetMessage {
     HelloLan(String, u16), // user_name, server_port
     HelloUser(String),     // user_name
     UserMessage(String),   // content
     UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
 }
 
-pub enum Event {
+enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     ReadFile(Result<Chunk>),
@@ -77,8 +77,8 @@ impl Application {
 
         let sender = event_queue.sender().clone(); // Collect read_file events
         let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
-            let sender = sender.clone();
-            read_file(sender, file, file_name, file_size, id)
+            let chunk = read_file(file, file_name, file_size, id);
+            sender.send(Event::ReadFile(chunk));
         }));
 
         terminal::enable_raw_mode()?;
@@ -144,8 +144,8 @@ impl Application {
                             state.progress_stop(id);
                         } else {
                             state.progress_pulse(id, file_size, bytes_read);
-                            let sender = self.event_queue.sender().clone();
-                            read_file(sender, file, file_name, file_size, id);
+                            let chunk = read_file(file, file_name, file_size, id);
+                            self.event_queue.sender().send(Event::ReadFile(chunk));
                         }
                         Ok(())
                     };
