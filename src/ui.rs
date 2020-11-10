@@ -102,12 +102,20 @@ fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
     let color = Color::LightGreen;
 
     let width = panel_width - 20;
-    let ui_step = width as f32 / max as f32;
-    let ui_current = (current as f32 * ui_step) as usize;
-    let ui_remaining = ((max.saturating_sub(current)) as f32 * ui_step) as usize;
+
+    let width = width as f64;
+    let current = current as f64;
+    let max = max as f64;
+
+    let pct = current / max;
+    let pct = if !pct.is_finite() { 0.0 } else { pct };
+
+    let ui_current = (pct * width) as usize;
+    let ui_remaining = width as usize - ui_current;
 
     let current: String = std::iter::repeat("#").take(ui_current).collect();
     let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
+
     let msg = format!("[{}{}]", current, remaining);
     let ui_message = vec![
         Span::styled(title, Style::default().fg(color)),
