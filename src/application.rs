@@ -23,6 +23,9 @@ use std::io::{self, Stdout};
 use std::net::SocketAddr;
 
 mod commands;
+mod read_event;
+
+use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
@@ -35,6 +38,7 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
+    ReadFile(Result<Chunk>),
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
@@ -44,6 +48,7 @@ pub struct Application {
     event_queue: EventQueue<Event>,
     network: NetworkManager,
     terminal: Terminal<CrosstermBackend<Stdout>>,
+    read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     discovery_addr: SocketAddr,
     tcp_server_addr: SocketAddr,
@@ -70,6 +75,12 @@ impl Application {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
+        let sender = event_queue.sender().clone(); // Collect read_file events
+        let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
+            let chunk = read_file(file, file_name, file_size, id);
+            sender.send(Event::ReadFile(chunk));
+        }));
+
         terminal::enable_raw_mode()?;
         io::stdout().execute(terminal::EnterAlternateScreen)?;
         let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -82,6 +93,7 @@ impl Application {
             event_queue,
             network,
             terminal,
+            read_file_ev,
             // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
             discovery_addr,
@@ -106,6 +118,46 @@ impl Application {
 
         loop {
             match self.event_queue.receive() {
+                Event::ReadFile(chunk) => {
+                    let try_send = || -> Result<()> {
+                        let Chunk {
+                            file,
+                            id,
+                            file_name,
+                            data,
+                            bytes_read,
+                            file_size,
+                        } = chunk?;
+
+                        self.network
+                            .send_all(
+                                state.all_user_endpoints(),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data, bytes_read)),
+                                    None,
+                                ),
+                            )
+                            .map_err(stringify_sendall_errors)?;
+
+                        if bytes_read == 0 {
+                            state.progress_stop(id);
+                        } else {
+                            state.progress_pulse(id, file_size, bytes_read);
+                            let chunk = read_file(file, file_name, file_size, id);
+                            self.event_queue.sender().send(Event::ReadFile(chunk));
+                        }
+                        Ok(())
+                    };
+
+                    if let Err(e) = try_send() {
+                        // we dont have the file_name here
+                        // we'll just stop the last progress
+                        state.progress_stop_last();
+                        let msg = format!("Error sending file. error: {}", e);
+                        state.add_message(termchat_message(msg, TermchatMessageType::Error));
+                    }
+                }
                 Event::Network(net_event) => match net_event {
                     NetEvent::Message(endpoint, message) => match message {
                         // by udp (multicast):

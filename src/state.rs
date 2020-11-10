@@ -4,13 +4,15 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
-use crate::util::{Progress, ProgressState};
+pub mod progress;
+use progress::ProgressState;
 
 pub enum MessageType {
     Connection,
     Disconnection,
     Content(String),
     Termchat(String, TermchatMessageType),
+    Progress(ProgressState),
 }
 
 #[derive(PartialEq)]
@@ -43,7 +45,6 @@ pub struct ApplicationState {
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
     last_user_id: usize,
-    pub progress: Progress,
 }
 
 pub enum CursorMovement {
@@ -69,7 +70,6 @@ impl ApplicationState {
             lan_users: HashMap::new(),
             users_id: HashMap::new(),
             last_user_id: 0,
-            progress: Progress::default(),
         }
     }
 
@@ -205,13 +205,5 @@ impl ApplicationState {
 
     pub fn add_message(&mut self, message: LogMessage) {
         self.messages.push(message);
-    }
-
-    pub fn progress(&self) -> Option<(usize, usize)> {
-        if let ProgressState::Working = self.progress.state {
-            Some((self.progress.current, self.progress.max))
-        } else {
-            None
-        }
     }
 }

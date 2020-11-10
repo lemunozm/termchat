@@ -1,6 +1,5 @@
-use super::state::{ApplicationState, MessageType, TermchatMessageType};
-use super::util::split_each;
-use crate::util::Result;
+use super::state::{progress::ProgressState, ApplicationState, MessageType, TermchatMessageType};
+use super::util::{split_each, Result};
 
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
@@ -33,7 +32,7 @@ fn draw_messages_panel(
 ) {
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
-    let mut messages = state
+    let messages = state
         .messages()
         .iter()
         .rev()
@@ -75,14 +74,10 @@ fn draw_messages_panel(
                         Span::styled(content, Style::default().fg(content_color)),
                     ])
                 }
+                MessageType::Progress(state) => Spans::from(add_progress_bar(chunk.width, state)),
             }
         })
         .collect::<Vec<_>>();
-
-    // check if there is a file being sent and if so draw the progress bar
-    if let Some(progress) = state.progress() {
-        add_progress_bar(&mut messages, chunk.width, progress);
-    }
 
     let messages_panel = Paragraph::new(messages)
         .block(Block::default().borders(Borders::ALL).title(Span::styled(
@@ -97,23 +92,36 @@ fn draw_messages_panel(
     frame.render_widget(messages_panel, chunk);
 }
 
-fn add_progress_bar(messages: &mut Vec<Spans>, panel_width: u16, progress: (usize, usize)) {
-    let (current, max) = progress;
+fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
+    let (title, current, max) = match progress {
+        ProgressState::Started(_) => ("Pending: ", 0, 0),
+        ProgressState::Working(_, max, current) => ("Sending: ", *current, *max),
+        ProgressState::Stopped(max) => ("Done! ", *max, *max),
+    };
+
     let color = Color::LightGreen;
 
     let width = panel_width - 20;
-    let ui_step = width as f32 / max as f32;
-    let ui_current = (current as f32 * ui_step) as usize;
-    let ui_remaining = ((max.saturating_sub(current)) as f32 * ui_step) as usize;
+
+    let width = width as f64;
+    let current = current as f64;
+    let max = max as f64;
+
+    let pct = current / max;
+    let pct = if !pct.is_finite() { 0.0 } else { pct };
+
+    let ui_current = (pct * width) as usize;
+    let ui_remaining = width as usize - ui_current;
 
     let current: String = std::iter::repeat("#").take(ui_current).collect();
     let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
+
     let msg = format!("[{}{}]", current, remaining);
     let ui_message = vec![
-        Span::styled("Sending: ", Style::default().fg(color)),
+        Span::styled(title, Style::default().fg(color)),
         Span::styled(msg, Style::default().fg(color)),
     ];
-    messages.insert(0, Spans::from(ui_message));
+    ui_message
 }
 
 fn parse_content(content: &str) -> Vec<Span> {
