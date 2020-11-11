@@ -13,7 +13,7 @@ Built on top of [tui-rs](https://github.com/fdehau/tui-rs) to create the termina
 [message-io](https://github.com/lemunozm/message-io) to make the network connections.
 
 <p align="center">
-  <img src="https://docs.google.com/drawings/d/e/2PACX-1vTqzOQn7e7_B0kK6thL_4OyyuXBJxf0c4xLfYbiFTbYuASI5qylPWjLKLrIPro4cvQTHYtWuU0ibdZt/pub?w=730&h=530" width="730"/>
+  <img src="https://drive.google.com/uc?export=view&id=1EsyinitIujJ4DBxixbu9jZC3A5g0YBBn"/>
 </p>
 
 # Installation
