@@ -1,29 +1,27 @@
 use super::state::{progress::ProgressState, State, MessageType, TermchatMessageType};
-use super::util::{split_each, Result};
+use super::util::{split_each};
 
 use tui::backend::CrosstermBackend;
 use tui::layout::{Alignment, Constraint, Direction, Layout, Rect};
 use tui::style::{Color, Modifier, Style};
 use tui::text::{Span, Spans};
 use tui::widgets::{Block, Borders, Paragraph, Wrap};
-use tui::{Frame, Terminal};
+use tui::{Frame};
 
 use std::io::Stdout;
 
 pub fn draw(
-    terminal: &mut Terminal<CrosstermBackend<Stdout>>,
+    frame: &mut Frame<CrosstermBackend<Stdout>>,
     state: &State,
-) -> Result<()>
-{
-    Ok(terminal.draw(|frame| {
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
-            .split(frame.size());
+    chunk: Rect,
+) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
+        .split(chunk);
 
-        draw_messages_panel(frame, state, chunks[0]);
-        draw_input_panel(frame, state, chunks[1]);
-    })?)
+    draw_messages_panel(frame, state, chunks[0]);
+    draw_input_panel(frame, state, chunks[1]);
 }
 
 fn draw_messages_panel(

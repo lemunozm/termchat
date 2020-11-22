@@ -1,25 +1,17 @@
 use super::state::{
     State, CursorMovement, LogMessage, MessageType, ScrollMovement, TermchatMessageType,
 };
-use super::terminal_events::TerminalEventCollector;
-use super::ui::{self};
+use crate::terminal_events::TerminalEventCollector;
+use crate::renderer::{Renderer};
 use crate::util::{stringify_sendall_errors, termchat_message, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::{
-    terminal::{self},
-    ExecutableCommand,
-};
-
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
 
 use message_io::events::EventQueue;
 use message_io::network::{NetEvent, NetworkManager, Endpoint};
 
 use serde::{Deserialize, Serialize};
 
-use std::io::{self};
 use std::net::{SocketAddrV4};
 
 mod commands;
@@ -92,11 +84,8 @@ impl<'a> Application<'a> {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        terminal::enable_raw_mode()?;
-        io::stdout().execute(terminal::EnterAlternateScreen)?;
-        let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
-        ui::draw(&mut terminal, &self.state)?;
+        let mut renderer = Renderer::new()?;
+        renderer.render(&self.state)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);
         let (_, server_addr) = self.network.listen_tcp(server_addr)?;
@@ -158,8 +147,9 @@ impl<'a> Application<'a> {
                     }
                 }
             }
-            ui::draw(&mut terminal, &self.state)?;
+            renderer.render(&self.state)?;
         }
+        //Renderer is destroyed here and the terminal is recovery
     }
 
     fn process_network_message(&mut self, endpoint: Endpoint, message: NetMessage) {
@@ -335,23 +325,5 @@ impl<'a> Application<'a> {
 
     fn process_command_event(&mut self) {
 
-    }
-}
-
-impl Drop for Application<'_> {
-    fn drop(&mut self) {
-        clean_terminal();
-    }
-}
-
-fn clean_terminal() {
-    io::stdout().execute(terminal::LeaveAlternateScreen).expect("Could not execute to stdout");
-    terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
-    if std::thread::panicking() {
-        eprintln!(
-            "{}, example: {}",
-            "termchat paniced, to log the error you can redirect stderror to a file",
-            "`termchat 2> termchat_log`"
-        );
     }
 }

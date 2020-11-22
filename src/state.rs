@@ -7,18 +7,18 @@ use std::collections::HashMap;
 pub mod progress;
 use progress::ProgressState;
 
+#[derive(PartialEq)]
+pub enum TermchatMessageType {
+    Error,
+    Notification,
+}
+
 pub enum MessageType {
     Connection,
     Disconnection,
     Content(String),
     Termchat(String, TermchatMessageType),
     Progress(ProgressState),
-}
-
-#[derive(PartialEq)]
-pub enum TermchatMessageType {
-    Error,
-    Notification,
 }
 
 pub struct LogMessage {

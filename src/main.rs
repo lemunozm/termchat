@@ -1,6 +1,7 @@
 mod application;
 mod state;
 mod terminal_events;
+mod renderer;
 mod ui;
 mod util;
 
