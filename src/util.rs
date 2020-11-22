@@ -25,10 +25,7 @@ pub fn split_each(input: String, width: usize) -> Vec<String> {
 // Termchat messages convenience function
 use crate::state::{LogMessage, MessageType, TermchatMessageType};
 pub fn termchat_message(content: String, msg_type: TermchatMessageType) -> LogMessage {
-    LogMessage::new(
-        "Termchat: ".into(),
-        MessageType::Termchat(content, msg_type),
-    )
+    LogMessage::new("Termchat: ".into(), MessageType::Termchat(content, msg_type))
 }
 
 // Errors

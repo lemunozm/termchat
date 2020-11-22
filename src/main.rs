@@ -56,7 +56,8 @@ fn main() {
         Ok(mut app) => {
             if let Err(e) = app.run() {
                 Some(e)
-            } else {
+            }
+            else {
                 None
             }
         }

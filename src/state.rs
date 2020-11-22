@@ -29,11 +29,7 @@ pub struct LogMessage {
 
 impl LogMessage {
     pub fn new(user: String, message_type: MessageType) -> LogMessage {
-        LogMessage {
-            date: Local::now(),
-            user,
-            message_type,
-        }
+        LogMessage { date: Local::now(), user, message_type }
     }
 }
 
@@ -198,7 +194,7 @@ impl ApplicationState {
     pub fn reset_input(&mut self) -> Option<String> {
         if !self.input.is_empty() {
             self.input_cursor = 0;
-            return Some(self.input.drain(..).collect());
+            return Some(self.input.drain(..).collect())
         }
         None
     }

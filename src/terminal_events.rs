@@ -17,16 +17,13 @@ pub struct TerminalEventCollector {
 
 impl TerminalEventCollector {
     pub fn new<C>(event_callback: C) -> Result<TerminalEventCollector>
-    where
-        C: Fn(Result<Event>) + Send + 'static,
-    {
+    where C: Fn(Result<Event>) + Send + 'static {
         let collector_thread_running = Arc::new(AtomicBool::new(true));
         let collector_thread_handle = {
             let running = collector_thread_running.clone();
             let timeout = Duration::from_millis(EVENT_SAMPLING_TIMEOUT);
-            thread::Builder::new()
-                .name("termchat: terminal event collector".into())
-                .spawn(move || {
+            thread::Builder::new().name("termchat: terminal event collector".into()).spawn(
+                move || {
                     let try_read = || -> Result<()> {
                         if crossterm::event::poll(timeout)? {
                             let event = crossterm::event::read()?;
@@ -39,7 +36,8 @@ impl TerminalEventCollector {
                             event_callback(Err(e));
                         }
                     }
-                })
+                },
+            )
         }?;
 
         Ok(TerminalEventCollector {
@@ -51,8 +49,7 @@ impl TerminalEventCollector {
 
 impl Drop for TerminalEventCollector {
     fn drop(&mut self) {
-        self.collector_thread_running
-            .store(false, Ordering::Relaxed);
+        self.collector_thread_running.store(false, Ordering::Relaxed);
         // the first unwrap is safe, beacuse we now the handle is some and this is the only time we take it
         self.collector_thread_handle
             .take()

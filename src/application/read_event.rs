@@ -40,7 +40,8 @@ pub fn read_file(
     file_name: String,
     file_size: usize,
     id: usize,
-) -> Result<Chunk> {
+) -> Result<Chunk>
+{
     use std::io::Read;
 
     const BLOCK: usize = 65536;

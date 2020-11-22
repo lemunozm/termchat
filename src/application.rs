@@ -60,7 +60,8 @@ impl Application {
         discovery_addr: SocketAddr,
         tcp_server_port: u16,
         user_name: &str,
-    ) -> Result<Application> {
+    ) -> Result<Application>
+    {
         // Guard to make sure to cleanup if a failure happens in the next lines
         let _g = Guard;
 
@@ -120,14 +121,7 @@ impl Application {
             match self.event_queue.receive() {
                 Event::ReadFile(chunk) => {
                     let try_send = || -> Result<()> {
-                        let Chunk {
-                            file,
-                            id,
-                            file_name,
-                            data,
-                            bytes_read,
-                            file_size,
-                        } = chunk?;
+                        let Chunk { file, id, file_name, data, bytes_read, file_size } = chunk?;
 
                         self.network
                             .send_all(
@@ -142,7 +136,8 @@ impl Application {
 
                         if bytes_read == 0 {
                             state.progress_stop(id);
-                        } else {
+                        }
+                        else {
                             state.progress_pulse(id, file_size, bytes_read);
                             let chunk = read_file(file, file_name, file_size, id);
                             self.event_queue.sender().send(Event::ReadFile(chunk));
@@ -201,7 +196,7 @@ impl Application {
                                             "{} encountred an error while sending {}, error: {}",
                                             user, file_name, error
                                         )
-                                        .into());
+                                        .into())
                                     }
                                     // if the error is none we know that maybe_data is some
                                     let (data, bytes_read) = maybe_data.unwrap();
@@ -217,7 +212,7 @@ impl Application {
                                             TermchatMessageType::Notification,
                                         );
                                         state.add_message(msg);
-                                        return Ok(());
+                                        return Ok(())
                                     }
 
                                     let path = std::env::temp_dir().join("termchat");
@@ -259,16 +254,13 @@ impl Application {
                 Event::Terminal(term_event) => match term_event {
                     TermEvent::Key(KeyEvent { code, modifiers }) => match code {
                         KeyCode::Esc => {
-                            self.event_queue
-                                .sender()
-                                .send_with_priority(Event::Close(None));
+                            self.event_queue.sender().send_with_priority(Event::Close(None));
                         }
                         KeyCode::Char(character) => {
                             if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
-                                self.event_queue
-                                    .sender()
-                                    .send_with_priority(Event::Close(None));
-                            } else {
+                                self.event_queue.sender().send_with_priority(Event::Close(None));
+                            }
+                            else {
                                 state.input_write(character);
                             }
                         }
@@ -282,7 +274,8 @@ impl Application {
                                         stringify_sendall_errors(e),
                                         TermchatMessageType::Error,
                                     )
-                                } else {
+                                }
+                                else {
                                     LogMessage::new(
                                         format!("{} (me)", self.user_name),
                                         MessageType::Content(input.clone()),
@@ -333,9 +326,10 @@ impl Application {
                 },
                 Event::Close(e) => {
                     if let Some(error) = e {
-                        return Err(error);
-                    } else {
-                        return Ok(());
+                        return Err(error)
+                    }
+                    else {
+                        return Ok(())
                     }
                 }
             }
@@ -358,9 +352,7 @@ impl Drop for Guard {
 }
 
 fn clean_terminal() {
-    io::stdout()
-        .execute(terminal::LeaveAlternateScreen)
-        .expect("Could not leave alternate screen");
+    io::stdout().execute(terminal::LeaveAlternateScreen).expect("Could not leave alternate screen");
     terminal::disable_raw_mode().expect("Could not disable raw mode at exit");
     if std::thread::panicking() {
         eprintln!(

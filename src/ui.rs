@@ -13,7 +13,8 @@ use std::io::Stdout;
 pub fn draw(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     state: &ApplicationState,
-) -> Result<()> {
+) -> Result<()>
+{
     Ok(terminal.draw(|frame| {
         let chunks = Layout::default()
             .direction(Direction::Vertical)
@@ -29,7 +30,8 @@ fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<Stdout>>,
     state: &ApplicationState,
     chunk: Rect,
-) {
+)
+{
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
@@ -39,7 +41,8 @@ fn draw_messages_panel(
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
                 MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
-            } else {
+            }
+            else {
                 Color::Green //because is a message of the own user
             };
             let date = message.date.format("%H:%M:%S ").to_string();
@@ -80,10 +83,11 @@ fn draw_messages_panel(
         .collect::<Vec<_>>();
 
     let messages_panel = Paragraph::new(messages)
-        .block(Block::default().borders(Borders::ALL).title(Span::styled(
-            "LAN Room",
-            Style::default().add_modifier(Modifier::BOLD),
-        )))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled("LAN Room", Style::default().add_modifier(Modifier::BOLD))),
+        )
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left)
         .scroll((state.scroll_messages_view() as u16, 0))
@@ -133,7 +137,8 @@ fn parse_content(content: &str) -> Vec<Span> {
                 // ?send
                 if index == 0 {
                     Span::styled(command, Style::default().fg(Color::LightYellow))
-                } else {
+                }
+                else {
                     Span::raw(part)
                 }
             })
@@ -145,7 +150,8 @@ fn parse_content(content: &str) -> Vec<Span> {
     if content.starts_with(SEND_COMMAND) {
         color_command(SEND_COMMAND)
     // other commands can be handled here the same way
-    } else {
+    }
+    else {
         vec![Span::raw(content)]
     }
 }
@@ -154,7 +160,8 @@ fn draw_input_panel(
     frame: &mut Frame<CrosstermBackend<Stdout>>,
     state: &ApplicationState,
     chunk: Rect,
-) {
+)
+{
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();
@@ -164,10 +171,11 @@ fn draw_input_panel(
         .collect::<Vec<_>>();
 
     let input_panel = Paragraph::new(input)
-        .block(Block::default().borders(Borders::ALL).title(Span::styled(
-            "Your message",
-            Style::default().add_modifier(Modifier::BOLD),
-        )))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(Span::styled("Your message", Style::default().add_modifier(Modifier::BOLD))),
+        )
         .style(Style::default().fg(Color::White))
         .alignment(Alignment::Left);
 

@@ -23,7 +23,7 @@ impl ApplicationState {
                         msg.message_type = MessageType::Progress(ProgressState::Working(
                             id, file_size, bytes_read,
                         ));
-                        break;
+                        break
                     }
                 }
                 // same file_size
@@ -34,7 +34,7 @@ impl ApplicationState {
                             file_size,
                             current_bytes + bytes_read,
                         ));
-                        break;
+                        break
                     }
                 }
                 _ => (),
@@ -48,7 +48,7 @@ impl ApplicationState {
                 MessageType::Progress(ProgressState::Started(msg_id)) => {
                     if msg_id == &id {
                         msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
-                        break;
+                        break
                     }
                 }
                 // same file_size
@@ -56,7 +56,7 @@ impl ApplicationState {
                     if msg_id == &id {
                         msg.message_type =
                             MessageType::Progress(ProgressState::Stopped(*current_bytes));
-                        break;
+                        break
                     }
                 }
                 _ => (),
@@ -69,13 +69,13 @@ impl ApplicationState {
             match &msg.message_type {
                 MessageType::Progress(ProgressState::Started(_)) => {
                     msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
-                    break;
+                    break
                 }
                 // same file_size
                 MessageType::Progress(ProgressState::Working(_, _, current_bytes)) => {
                     msg.message_type =
                         MessageType::Progress(ProgressState::Stopped(*current_bytes));
-                    break;
+                    break
                 }
                 _ => (),
             }
