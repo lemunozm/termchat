@@ -7,6 +7,10 @@ pub enum ProgressState {
     Stopped(usize),               // file_size
 }
 
+pub struct ProgressBar {
+    state: ProgressState,
+}
+
 impl State {
     pub fn progress_start(&mut self, id: usize) {
         self.messages.push(ChatMessage::new(

@@ -3,6 +3,7 @@ use super::state::{
 };
 use crate::terminal_events::TerminalEventCollector;
 use crate::renderer::{Renderer};
+use crate::commands::{CommandManager, Action, Processing};
 use crate::util::{self, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -14,10 +15,9 @@ use serde::{Deserialize, Serialize};
 
 use std::net::{SocketAddrV4};
 
-mod commands;
-mod read_event;
+//mod read_event;
 
-use read_event::{read_file, Chunk, ReadFile};
+//use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
@@ -30,7 +30,8 @@ enum NetMessage {
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
-    ReadFile(Result<Chunk>),
+    Action(Box<dyn Action>),
+    //ReadFile(Result<Chunk>),
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
@@ -46,7 +47,8 @@ pub struct Application<'a> {
     config: &'a Config,
     state: State,
     network: NetworkManager,
-    read_file_ev: ReadFile,
+    commands: CommandManager,
+    //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
 }
@@ -66,18 +68,20 @@ impl<'a> Application<'a> {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
+        /*
         let sender = event_queue.sender().clone(); // Collect read_file events
         let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
             let chunk = read_file(file, file_name, file_size, id);
             sender.send(Event::ReadFile(chunk));
         }));
+        */
 
         Ok(Application {
             config,
             state: State::new(),
             network,
-            read_file_ev,
-            // Stored because we want its internal thread functionality until the Application was dropped
+            commands: CommandManager::default(),
+            // Stored because we want its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
         })
@@ -97,6 +101,7 @@ impl<'a> Application<'a> {
 
         loop {
             match self.event_queue.receive() {
+                /*
                 Event::ReadFile(chunk) => {
                     let try_send = || -> Result<()> {
                         let Chunk { file, id, file_name, data, bytes_read, file_size } = chunk?;
@@ -131,15 +136,22 @@ impl<'a> Application<'a> {
                         self.state.add_system_message(msg, SystemMessageType::Error);
                     }
                 }
+                */
                 Event::Network(net_event) => match net_event {
-                    NetEvent::Message(endpoint, message) =>
-                        self.process_network_message(endpoint, message),
+                    NetEvent::Message(endpoint, message) => {
+                        self.process_network_message(endpoint, message);
+                    }
                     NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) =>
+                    NetEvent::RemovedEndpoint(endpoint) => {
                         self.state.disconnected_user(endpoint)
+                    }
                 },
-                Event::Terminal(term_event) =>
-                    self.process_terminal_event(term_event),
+                Event::Terminal(term_event) => {
+                    self.process_terminal_event(term_event);
+                }
+                Event::Action(action) => {
+                    self.process_action(action);
+                }
                 Event::Close(error) => {
                     return match error {
                         Some(error) => Err(error),
@@ -149,7 +161,7 @@ impl<'a> Application<'a> {
             }
             renderer.render(&self.state)?;
         }
-        //Renderer is destroyed here and the terminal is recovery
+        //Renderer is destroyed here and the terminal is recovered
     }
 
     fn process_network_message(&mut self, endpoint: Endpoint, message: NetMessage) {
@@ -252,16 +264,25 @@ impl<'a> Application<'a> {
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
-                        if let Err(e) = self.parse_input(&input) {
-                            self.state.add_system_message(e.to_string(), SystemMessageType::Error);
-                        }
-                        else {
+                        let should_send = match self.commands.find_command_action(&input) {
+                            Some(Ok(action)) => self.process_action(action),
+                            Some(Err(e)) => {
+                                self.state.add_system_message(
+                                    e.to_string(),
+                                    SystemMessageType::Error
+                                );
+                                false
+                            }
+                            None => true,
+                        };
+
+                        if should_send {
                             let result = self.network.send_all(
                                 self.state.all_user_endpoints(),
                                 NetMessage::UserMessage(input.clone())
                             );
 
-                            //TODO: Should print the Ok version if some endpoint was connected
+                            //TODO: Should print the Ok version if some endpoint is connected
                             match result {
                                 Ok(_) => {
                                     let message = ChatMessage::new(
@@ -310,7 +331,17 @@ impl<'a> Application<'a> {
         }
     }
 
-    fn process_command_event(&mut self) {
-
+    fn process_action(&mut self, mut action: Box<dyn Action>) -> bool {
+        match action.process(&mut self.state) {
+            Ok(Processing::Completed) => true,
+            Ok(Processing::Partial) => {
+                self.event_queue.sender().send(Event::Action(action));
+                true
+            }
+            Err(error) => {
+                self.state.add_system_message(error.to_string(), SystemMessageType::Error);
+                false
+            }
+        }
     }
 }

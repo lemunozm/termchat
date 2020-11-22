@@ -22,16 +22,6 @@ impl ReadFile {
     }
 
     pub fn send(&mut self, file_name: String, path: std::path::PathBuf) -> Result<usize> {
-        use std::convert::TryInto;
-
-        let file_size = std::fs::metadata(&path)?.len().try_into()?;
-        let file = std::fs::File::open(path)?;
-
-        let send_id = self.id;
-        (self.callback)(file, file_name, file_size, send_id);
-        self.id += 1;
-
-        Ok(send_id)
     }
 }
 

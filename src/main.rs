@@ -2,6 +2,7 @@ mod application;
 mod state;
 mod terminal_events;
 mod renderer;
+mod commands;
 mod ui;
 mod util;
 

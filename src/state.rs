@@ -5,7 +5,9 @@ use chrono::{DateTime, Local};
 use std::collections::HashMap;
 
 pub mod progress;
-use progress::ProgressState;
+use progress::{ProgressBar, ProgressState};
+
+pub type MessageId = usize;
 
 #[derive(PartialEq)]
 pub enum SystemMessageType {
@@ -199,8 +201,9 @@ impl State {
         None
     }
 
-    pub fn add_message(&mut self, message: ChatMessage) {
+    pub fn add_message(&mut self, message: ChatMessage) -> MessageId {
         self.messages.push(message);
+        self.messages.len() - 1
     }
 
     pub fn add_system_message(&mut self, content: String, msg_type: SystemMessageType) {
