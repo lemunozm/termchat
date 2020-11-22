@@ -8,6 +8,8 @@ use application::Application;
 
 use clap::{App, Arg};
 
+use std::net::{SocketAddrV4};
+
 fn main() {
     let os_username = whoami::username();
 
@@ -20,6 +22,10 @@ fn main() {
                 .long("discovery")
                 .short("d")
                 .default_value("238.255.0.1:5877")
+                .validator(|addr| match addr.parse::<SocketAddrV4>() {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err("The value must have syntax ipv4:port".into())
+                })
                 .help("Multicast address to found others 'termchat' applications"),
         )
         .arg(
@@ -27,6 +33,10 @@ fn main() {
                 .long("tcp-server-port")
                 .short("t")
                 .default_value("0")
+                .validator(|port| match port.parse::<u16>() {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err("The value must be in range 0..65535".into())
+                })
                 .help("Tcp server port used when communicating with other termchat instances"),
         )
         .arg(
@@ -40,30 +50,16 @@ fn main() {
 
     // The next unwraps are safe because we specified a default value
 
-    let discovery_addr = match matches.value_of("discovery").unwrap().parse() {
-        Ok(discovery_addr) => discovery_addr,
-        Err(_) => return eprintln!("'discovery' must be a valid multicast address"),
-    };
-
-    let tcp_server_port = match matches.value_of("tcp_server_port").unwrap().parse() {
-        Ok(port) => port,
-        Err(_) => return eprintln!("Unable to parse tcp server port"),
-    };
-
+    let discovery_addr = matches.value_of("discovery").unwrap().parse().unwrap();
+    let tcp_server_port = matches.value_of("tcp_server_port").unwrap().parse().unwrap();
     let name = matches.value_of("username").unwrap();
 
-    let error = match Application::new(discovery_addr, tcp_server_port, &name) {
-        Ok(mut app) => {
-            if let Err(e) = app.run() {
-                Some(e)
-            }
-            else {
-                None
-            }
-        }
-        Err(e) => Some(e),
+    let result = match Application::new(discovery_addr, tcp_server_port, &name) {
+        Ok(mut app) => app.run(),
+        Err(e) => Err(e),
     };
-    if let Some(e) = error {
+
+    if let Err(e) = result {
         // app is now dropped we can print to stderr safely
         eprintln!("termchat exited with error: {}", e);
     }
