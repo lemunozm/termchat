@@ -1,17 +1,16 @@
 use super::Application;
-use crate::state::ApplicationState;
 use crate::util::Result;
 
 impl Application {
-    pub fn parse_input(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
+    pub fn parse_input(&mut self, input: &str) -> Result<()> {
         const SEND_COMMAND: &str = "?send";
         if input.starts_with(SEND_COMMAND) {
-            self.handle_send_command(input, state)?;
+            self.handle_send_command(input)?;
         }
         Ok(())
     }
 
-    fn handle_send_command(&mut self, input: &str, state: &mut ApplicationState) -> Result<()> {
+    fn handle_send_command(&mut self, input: &str) -> Result<()> {
         const READ_FILENAME_ERROR: &str = "Unable to read file name";
 
         let path =
@@ -24,7 +23,7 @@ impl Application {
             .to_string();
 
         let send_id = self.read_file_ev.send(file_name, path.to_path_buf())?;
-        state.progress_start(send_id);
+        self.state.progress_start(send_id);
 
         Ok(())
     }

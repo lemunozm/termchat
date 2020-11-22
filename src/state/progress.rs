@@ -1,4 +1,4 @@
-use super::{ApplicationState, LogMessage, MessageType};
+use super::{State, LogMessage, MessageType};
 
 #[derive(PartialEq)]
 pub enum ProgressState {
@@ -7,7 +7,7 @@ pub enum ProgressState {
     Stopped(usize),               // file_size
 }
 
-impl ApplicationState {
+impl State {
     pub fn progress_start(&mut self, id: usize) {
         self.messages.push(LogMessage::new(
             "Sending".into(),

@@ -33,7 +33,7 @@ impl LogMessage {
     }
 }
 
-pub struct ApplicationState {
+pub struct State {
     messages: Vec<LogMessage>,
     scroll_messages_view: usize,
     input: Vec<char>,
@@ -56,9 +56,9 @@ pub enum ScrollMovement {
     Start,
 }
 
-impl ApplicationState {
-    pub fn new() -> ApplicationState {
-        ApplicationState {
+impl State {
+    pub fn new() -> State {
+        State {
             messages: Vec::new(),
             scroll_messages_view: 0,
             input: vec![],

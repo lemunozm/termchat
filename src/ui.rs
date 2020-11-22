@@ -1,4 +1,4 @@
-use super::state::{progress::ProgressState, ApplicationState, MessageType, TermchatMessageType};
+use super::state::{progress::ProgressState, State, MessageType, TermchatMessageType};
 use super::util::{split_each, Result};
 
 use tui::backend::CrosstermBackend;
@@ -12,7 +12,7 @@ use std::io::Stdout;
 
 pub fn draw(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
-    state: &ApplicationState,
+    state: &State,
 ) -> Result<()>
 {
     Ok(terminal.draw(|frame| {
@@ -28,7 +28,7 @@ pub fn draw(
 
 fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<Stdout>>,
-    state: &ApplicationState,
+    state: &State,
     chunk: Rect,
 )
 {
@@ -158,7 +158,7 @@ fn parse_content(content: &str) -> Vec<Span> {
 
 fn draw_input_panel(
     frame: &mut Frame<CrosstermBackend<Stdout>>,
-    state: &ApplicationState,
+    state: &State,
     chunk: Rect,
 )
 {
