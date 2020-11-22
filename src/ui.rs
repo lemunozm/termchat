@@ -1,4 +1,4 @@
-use super::state::{progress::ProgressState, State, MessageType, TermchatMessageType};
+use super::state::{progress::ProgressState, State, MessageType, SystemMessageType};
 use super::util::{split_each};
 
 use tui::backend::CrosstermBackend;
@@ -55,7 +55,7 @@ fn draw_messages_panel(
                     Span::styled(&message.user, Style::default().fg(color)),
                     Span::styled(" is offline", Style::default().fg(color)),
                 ]),
-                MessageType::Content(content) => {
+                MessageType::Text(content) => {
                     let mut ui_message = vec![
                         Span::styled(date, Style::default().fg(Color::DarkGray)),
                         Span::styled(&message.user, Style::default().fg(color)),
@@ -64,10 +64,10 @@ fn draw_messages_panel(
                     ui_message.extend(parse_content(content));
                     Spans::from(ui_message)
                 }
-                MessageType::Termchat(content, msg_type) => {
+                MessageType::System(content, msg_type) => {
                     let (user_color, content_color) = match msg_type {
-                        TermchatMessageType::Notification => (Color::Yellow, Color::LightYellow),
-                        TermchatMessageType::Error => (Color::Red, Color::LightRed),
+                        SystemMessageType::Notification => (Color::Yellow, Color::LightYellow),
+                        SystemMessageType::Error => (Color::Red, Color::LightRed),
                     };
                     Spans::from(vec![
                         Span::styled(date, Style::default().fg(Color::DarkGray)),

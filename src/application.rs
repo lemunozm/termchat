@@ -1,9 +1,9 @@
 use super::state::{
-    State, CursorMovement, LogMessage, MessageType, ScrollMovement, TermchatMessageType,
+    State, CursorMovement, ChatMessage, MessageType, ScrollMovement, SystemMessageType,
 };
 use crate::terminal_events::TerminalEventCollector;
 use crate::renderer::{Renderer};
-use crate::util::{stringify_sendall_errors, termchat_message, Error, Result};
+use crate::util::{self, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
@@ -110,7 +110,7 @@ impl<'a> Application<'a> {
                                     None,
                                 ),
                             )
-                            .map_err(stringify_sendall_errors)?;
+                            .map_err(util::stringify_sendall_errors)?;
 
                         if bytes_read == 0 {
                             self.state.progress_stop(id);
@@ -128,7 +128,7 @@ impl<'a> Application<'a> {
                         // we'll just stop the last progress
                         self.state.progress_stop_last();
                         let msg = format!("Error sending file. error: {}", e);
-                        self.state.add_message(termchat_message(msg, TermchatMessageType::Error));
+                        self.state.add_system_message(msg, SystemMessageType::Error);
                     }
                 }
                 Event::Network(net_event) => match net_event {
@@ -166,9 +166,7 @@ impl<'a> Application<'a> {
                         Ok(())
                     };
                     if let Err(e) = try_connect() {
-                        let message =
-                            termchat_message(e.to_string(), TermchatMessageType::Error);
-                        self.state.add_message(message);
+                        self.state.add_system_message(e.to_string(), SystemMessageType::Error);
                     }
                 }
             }
@@ -178,8 +176,7 @@ impl<'a> Application<'a> {
             }
             NetMessage::UserMessage(content) => {
                 if let Some(user) = self.state.user_name(endpoint) {
-                    let message =
-                        LogMessage::new(user.into(), MessageType::Content(content));
+                    let message = ChatMessage::new(user.into(), MessageType::Text(content));
                     self.state.add_message(message);
                 }
             }
@@ -206,11 +203,7 @@ impl<'a> Application<'a> {
                                 "Successfully received file {} from user {} !",
                                 file_name, user
                             );
-                            let msg = termchat_message(
-                                msg,
-                                TermchatMessageType::Notification,
-                            );
-                            self.state.add_message(msg);
+                            self.state.add_system_message(msg, SystemMessageType::Notification);
                             return Ok(())
                         }
 
@@ -233,14 +226,8 @@ impl<'a> Application<'a> {
                             "termchat: Failed to write data sent from user: {}",
                             user
                         );
-                        self.state.add_message(termchat_message(
-                            message,
-                            TermchatMessageType::Error,
-                        ));
-                        self.state.add_message(termchat_message(
-                            e.to_string(),
-                            TermchatMessageType::Error,
-                        ));
+                        self.state.add_system_message(message, SystemMessageType::Error);
+                        self.state.add_system_message(e.to_string(), SystemMessageType::Error);
                     }
                 }
             }
@@ -265,29 +252,29 @@ impl<'a> Application<'a> {
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
-                        let message = if let Err(e) = self.network.send_all(
-                            self.state.all_user_endpoints(),
-                            NetMessage::UserMessage(input.clone()),
-                        ) {
-                            termchat_message(
-                                stringify_sendall_errors(e),
-                                TermchatMessageType::Error,
-                            )
+                        if let Err(e) = self.parse_input(&input) {
+                            self.state.add_system_message(e.to_string(), SystemMessageType::Error);
                         }
                         else {
-                            LogMessage::new(
-                                format!("{} (me)", self.config.user_name),
-                                MessageType::Content(input.clone()),
-                            )
-                        };
+                            let result = self.network.send_all(
+                                self.state.all_user_endpoints(),
+                                NetMessage::UserMessage(input.clone())
+                            );
 
-                        self.state.add_message(message);
-
-                        if let Err(parse_error) = self.parse_input(&input) {
-                            self.state.add_message(termchat_message(
-                                parse_error.to_string(),
-                                TermchatMessageType::Error,
-                            ));
+                            //TODO: Should print the Ok version if some endpoint was connected
+                            match result {
+                                Ok(_) => {
+                                    let message = ChatMessage::new(
+                                        format!("{} (me)", self.config.user_name),
+                                        MessageType::Text(input.clone()),
+                                    );
+                                    self.state.add_message(message);
+                                },
+                                Err(e) => {
+                                    let errors = util::stringify_sendall_errors(e);
+                                    self.state.add_system_message(errors, SystemMessageType::Error);
+                                }
+                            }
                         }
                     }
                 }

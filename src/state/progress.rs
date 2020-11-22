@@ -1,4 +1,4 @@
-use super::{State, LogMessage, MessageType};
+use super::{State, ChatMessage, MessageType};
 
 #[derive(PartialEq)]
 pub enum ProgressState {
@@ -9,7 +9,7 @@ pub enum ProgressState {
 
 impl State {
     pub fn progress_start(&mut self, id: usize) {
-        self.messages.push(LogMessage::new(
+        self.messages.push(ChatMessage::new(
             "Sending".into(),
             MessageType::Progress(ProgressState::Started(id)),
         ))

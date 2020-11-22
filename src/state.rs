@@ -8,7 +8,7 @@ pub mod progress;
 use progress::ProgressState;
 
 #[derive(PartialEq)]
-pub enum TermchatMessageType {
+pub enum SystemMessageType {
     Error,
     Notification,
 }
@@ -16,25 +16,25 @@ pub enum TermchatMessageType {
 pub enum MessageType {
     Connection,
     Disconnection,
-    Content(String),
-    Termchat(String, TermchatMessageType),
+    Text(String),
+    System(String, SystemMessageType),
     Progress(ProgressState),
 }
 
-pub struct LogMessage {
+pub struct ChatMessage {
     pub date: DateTime<Local>,
     pub user: String,
     pub message_type: MessageType,
 }
 
-impl LogMessage {
-    pub fn new(user: String, message_type: MessageType) -> LogMessage {
-        LogMessage { date: Local::now(), user, message_type }
+impl ChatMessage {
+    pub fn new(user: String, message_type: MessageType) -> ChatMessage {
+        ChatMessage { date: Local::now(), user, message_type }
     }
 }
 
 pub struct State {
-    messages: Vec<LogMessage>,
+    messages: Vec<ChatMessage>,
     scroll_messages_view: usize,
     input: Vec<char>,
     input_cursor: usize,
@@ -69,7 +69,7 @@ impl State {
         }
     }
 
-    pub fn messages(&self) -> &Vec<LogMessage> {
+    pub fn messages(&self) -> &Vec<ChatMessage> {
         &self.messages
     }
 
@@ -125,14 +125,14 @@ impl State {
             self.users_id.insert(user.into(), self.last_user_id);
         }
         self.last_user_id += 1;
-        self.add_message(LogMessage::new(user.into(), MessageType::Connection));
+        self.add_message(ChatMessage::new(user.into(), MessageType::Connection));
     }
 
     pub fn disconnected_user(&mut self, endpoint: Endpoint) {
         if self.lan_users.contains_key(&endpoint) {
             // unwrap is safe because of the check above
             let user = self.lan_users.remove(&endpoint).unwrap();
-            self.add_message(LogMessage::new(user, MessageType::Disconnection));
+            self.add_message(ChatMessage::new(user, MessageType::Disconnection));
         }
     }
 
@@ -199,7 +199,13 @@ impl State {
         None
     }
 
-    pub fn add_message(&mut self, message: LogMessage) {
+    pub fn add_message(&mut self, message: ChatMessage) {
+        self.messages.push(message);
+    }
+
+    pub fn add_system_message(&mut self, content: String, msg_type: SystemMessageType) {
+        let message_type = MessageType::System(content, msg_type);
+        let message = ChatMessage::new("Termchat: ".into(), message_type);
         self.messages.push(message);
     }
 }
