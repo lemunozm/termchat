@@ -1,7 +1,7 @@
 use super::Application;
 use crate::util::Result;
 
-impl Application {
+impl Application<'_> {
     pub fn parse_input(&mut self, input: &str) -> Result<()> {
         const SEND_COMMAND: &str = "?send";
         if input.starts_with(SEND_COMMAND) {

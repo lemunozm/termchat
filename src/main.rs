@@ -4,7 +4,7 @@ mod terminal_events;
 mod ui;
 mod util;
 
-use application::Application;
+use application::{Application, Config};
 
 use clap::{App, Arg};
 
@@ -48,13 +48,14 @@ fn main() {
         )
         .get_matches();
 
-    // The next unwraps are safe because we specified a default value
+    // The next unwraps are safe because we specified a default value and a validator
+    let config = Config {
+        discovery_addr: matches.value_of("discovery").unwrap().parse().unwrap(),
+        tcp_server_port: matches.value_of("tcp_server_port").unwrap().parse().unwrap(),
+        user_name: matches.value_of("username").unwrap().into(),
+    };
 
-    let discovery_addr = matches.value_of("discovery").unwrap().parse().unwrap();
-    let tcp_server_port = matches.value_of("tcp_server_port").unwrap().parse().unwrap();
-    let name = matches.value_of("username").unwrap();
-
-    let result = match Application::new(discovery_addr, tcp_server_port, &name) {
+    let result = match Application::new(&config) {
         Ok(mut app) => app.run(),
         Err(e) => Err(e),
     };

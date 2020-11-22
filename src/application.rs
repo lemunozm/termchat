@@ -20,7 +20,7 @@ use message_io::network::{NetEvent, NetworkManager, Endpoint};
 use serde::{Deserialize, Serialize};
 
 use std::io::{self, Stdout};
-use std::net::{SocketAddr, SocketAddrV4};
+use std::net::{SocketAddrV4};
 
 mod commands;
 mod read_event;
@@ -44,25 +44,24 @@ enum Event {
     Close(Option<Error>),
 }
 
-pub struct Application {
+pub struct Config {
+    pub discovery_addr: SocketAddrV4,
+    pub tcp_server_port: u16,
+    pub user_name: String,
+}
+
+pub struct Application<'a> {
+    config: &'a Config,
+    state: State,
     network: NetworkManager,
     terminal: Terminal<CrosstermBackend<Stdout>>,
     read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
-    discovery_addr: SocketAddrV4,
-    tcp_server_addr: SocketAddr,
-    user_name: String,
-    state: State,
 }
 
-impl Application {
-    pub fn new(
-        discovery_addr: SocketAddrV4,
-        tcp_server_port: u16,
-        user_name: &str,
-    ) -> Result<Application>
-    {
+impl<'a> Application<'a> {
+    pub fn new(config: &'a Config) -> Result<Application<'a>> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
@@ -93,27 +92,26 @@ impl Application {
         std::mem::forget(_g);
 
         Ok(Application {
-            event_queue,
+            config,
+            state: State::new(),
             network,
             terminal,
             read_file_ev,
             // Stored because we want its internal thread functionality until the Application was dropped
             _terminal_events,
-            discovery_addr,
-            tcp_server_addr: ([0, 0, 0, 0], tcp_server_port).into(),
-            user_name: user_name.into(),
-            state: State::new(),
+            event_queue,
         })
     }
 
     pub fn run(&mut self) -> Result<()> {
         ui::draw(&mut self.terminal, &self.state)?;
 
-        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr)?;
-        self.network.listen_udp_multicast(self.discovery_addr)?;
+        let server_addr = ("0.0.0.0", self.config.tcp_server_port);
+        let (_, server_addr) = self.network.listen_tcp(server_addr)?;
+        self.network.listen_udp_multicast(self.config.discovery_addr)?;
 
-        let discovery_endpoint = self.network.connect_udp(self.discovery_addr)?;
-        let message = NetMessage::HelloLan(self.user_name.clone(), server_addr.port());
+        let discovery_endpoint = self.network.connect_udp(self.config.discovery_addr)?;
+        let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
         self.network.send(discovery_endpoint, message)?;
 
         loop {
@@ -177,10 +175,10 @@ impl Application {
             // by udp (multicast):
             NetMessage::HelloLan(user, server_port) => {
                 let server_addr = (endpoint.addr().ip(), server_port);
-                if user != self.user_name {
+                if user != self.config.user_name {
                     let mut try_connect = || -> Result<()> {
                         let user_endpoint = self.network.connect_tcp(server_addr)?;
-                        let message = NetMessage::HelloUser(self.user_name.clone());
+                        let message = NetMessage::HelloUser(self.config.user_name.clone());
                         self.network.send(user_endpoint, message)?;
                         self.state.connected_user(user_endpoint, &user);
                         Ok(())
@@ -296,7 +294,7 @@ impl Application {
                         }
                         else {
                             LogMessage::new(
-                                format!("{} (me)", self.user_name),
+                                format!("{} (me)", self.config.user_name),
                                 MessageType::Content(input.clone()),
                             )
                         };
@@ -348,7 +346,7 @@ impl Application {
     }
 }
 
-impl Drop for Application {
+impl Drop for Application<'_> {
     fn drop(&mut self) {
         clean_terminal();
     }
