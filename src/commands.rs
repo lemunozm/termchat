@@ -17,7 +17,7 @@ pub struct CommandManager {
 
 impl CommandManager {
     const COMMAND_PREFIX: &'static str = "?";
-    pub fn with(&mut self, command_parser: impl Command + 'static) -> &mut Self {
+    pub fn with(mut self, command_parser: impl Command + 'static) -> Self {
         self.parsers.insert(command_parser.name(), Box::new(command_parser));
         self
     }

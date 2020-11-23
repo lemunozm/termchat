@@ -26,6 +26,8 @@ pub fn split_each(input: String, width: usize) -> Vec<String> {
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
 
+/*
+//TODO: Should send the file even if some endpoint of send_all gives an error.
 pub fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, std::io::Error)>) -> String {
     let mut out = String::new();
     for (endpoint, error) in e {
@@ -39,3 +41,4 @@ pub fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, std::io::
     }
     out
 }
+*/

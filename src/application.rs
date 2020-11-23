@@ -3,30 +3,22 @@ use crate::terminal_events::{TerminalEventCollector};
 use crate::renderer::{Renderer};
 use crate::action::{Action, Processing};
 use crate::commands::{CommandManager};
-use crate::util::{self, Error, Result};
+use crate::message::{NetMessage, Chunk};
+use crate::util::{Error, Result};
+use crate::commands::send_file::{SendFileCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 use message_io::events::{EventQueue};
 use message_io::network::{NetEvent, NetworkManager, Endpoint};
 
-use serde::{Deserialize, Serialize};
-
 use std::net::{SocketAddrV4};
-
-#[derive(Serialize, Deserialize)]
-enum NetMessage {
-    HelloLan(String, u16), // user_name, server_port
-    HelloUser(String),     // user_name
-    UserMessage(String),   // content
-    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
-}
+use std::io::{ErrorKind};
 
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     Action(Box<dyn Action>),
-    //ReadFile(Result<Chunk>),
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
@@ -69,8 +61,8 @@ impl<'a> Application<'a> {
             config,
             state: State::new(),
             network,
-            commands: CommandManager::default(),
-            // Stored because we want its internal thread running until the Application was dropped
+            commands: CommandManager::default().with(SendFileCommand),
+            // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
         })
@@ -145,59 +137,50 @@ impl<'a> Application<'a> {
                     self.state.add_message(message);
                 }
             }
-            NetMessage::UserData(file_name, maybe_data, maybe_error) => {
+            NetMessage::UserData(file_name, chunk) => {
                 use std::io::Write;
                 if self.state.user_name(endpoint).is_some() {
                     // safe unwrap due to check
                     let user = self.state.user_name(endpoint).unwrap().to_owned();
 
-                    let try_write = || -> Result<()> {
-                        if let Some(error) = maybe_error {
-                            return Err(format!(
-                                "{} encountred an error while sending {}, error: {}",
-                                user, file_name, error
-                            )
-                            .into())
-                        }
-                        // if the error is none we know that maybe_data is some
-                        let (data, bytes_read) = maybe_data.unwrap();
-
-                        //done
-                        if bytes_read == 0 {
+                    match chunk {
+                        Chunk::Error => {
                             let msg = format!(
-                                "Successfully received file {} from user {} !",
+                                "'{}' had an error while sending '{}'",
+                                user, file_name
+                            );
+                            self.state.add_system_error_message(msg);
+                        }
+                        Chunk::End => {
+                            let msg = format!(
+                                "Successfully received file '{}' from user '{}'!",
                                 file_name, user
                             );
                             self.state.add_system_info_message(msg);
-                            return Ok(())
                         }
+                        Chunk::Data(data) => {
+                            let try_write = || -> Result<()> {
+                                let user_path = std::env::temp_dir().join("termchat").join(&user);
+                                match std::fs::create_dir_all(&user_path) {
+                                    Ok(_) => (),
+                                    Err(ref err) if err.kind() == ErrorKind::AlreadyExists => (),
+                                    Err(e) => Err(e)?,
+                                }
 
-                        let user_path = std::env::temp_dir().join("termchat").join(&user);
+                                let file_path = user_path.join(file_name);
+                                std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open(file_path)?
+                                    .write_all(&data)?;
 
-                        match std::fs::create_dir_all(&user_path) {
-                            Ok(_) => (),
-                            Err(ref err) if err.kind() == std::io::ErrorKind::Interrupted => (),
-                            Err(e) => Err(e)?,
+                                Ok(())
+                            };
+
+                            if let Err(error) = try_write() {
+                                self.state.add_system_error_message(error.to_string());
+                            }
                         }
-
-                        let file_path = user_path.join(file_name);
-
-                        std::fs::OpenOptions::new()
-                            .create(true)
-                            .append(true)
-                            .open(file_path)?
-                            .write_all(&data)?;
-
-                        Ok(())
-                    };
-
-                    if let Err(error) = try_write() {
-                        let message = format!(
-                            "termchat: Failed to write data sent from user: {}",
-                            user
-                        );
-                        self.state.add_system_error_message(message);
-                        self.state.add_system_error_message(error.to_string());
                     }
                 }
             }
@@ -223,7 +206,10 @@ impl<'a> Application<'a> {
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
                         let should_send = match self.commands.find_command_action(&input) {
-                            Some(Ok(action)) => self.process_action(action),
+                            Some(Ok(action)) => {
+                                self.process_action(action);
+                                true
+                            }
                             Some(Err(e)) => {
                                 self.state.add_system_error_message(e.to_string());
                                 false
@@ -232,25 +218,16 @@ impl<'a> Application<'a> {
                         };
 
                         if should_send {
-                            let result = self.network.send_all(
+                            self.network.send_all(
                                 self.state.all_user_endpoints(),
                                 NetMessage::UserMessage(input.clone())
-                            );
+                            ).ok(); //Best effort
 
-                            //TODO: Should print the Ok version if some endpoint is connected
-                            match result {
-                                Ok(_) => {
-                                    let message = ChatMessage::new(
-                                        format!("{} (me)", self.config.user_name),
-                                        MessageType::Text(input.clone()),
-                                    );
-                                    self.state.add_message(message);
-                                },
-                                Err(e) => {
-                                    let errors = util::stringify_sendall_errors(e);
-                                    self.state.add_system_error_message(errors);
-                                }
-                            }
+                            let message = ChatMessage::new(
+                                format!("{} (me)", self.config.user_name),
+                                MessageType::Text(input.clone()),
+                            );
+                            self.state.add_message(message);
                         }
                     }
                 }
@@ -286,16 +263,11 @@ impl<'a> Application<'a> {
         }
     }
 
-    fn process_action(&mut self, mut action: Box<dyn Action>) -> bool {
+    fn process_action(&mut self, mut action: Box<dyn Action>) {
         match action.process(&mut self.state, &mut self.network) {
-            Ok(Processing::Completed) => true,
-            Ok(Processing::Partial) => {
+            Processing::Completed => (),
+            Processing::Partial => {
                 self.event_queue.sender().send(Event::Action(action));
-                true
-            }
-            Err(error) => {
-                self.state.add_system_error_message(error.to_string());
-                false
             }
         }
     }

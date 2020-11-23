@@ -1,13 +1,13 @@
+pub mod progress;
+
+use progress::{ProgressBar, ProgressState};
+
 use message_io::network::Endpoint;
 
 use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
-pub mod progress;
-use progress::{ProgressBar, ProgressState};
-
-pub type MessageId = usize;
 
 #[derive(PartialEq)]
 pub enum SystemMessageType {
@@ -201,7 +201,7 @@ impl State {
         None
     }
 
-    pub fn add_message(&mut self, message: ChatMessage) -> MessageId {
+    pub fn add_message(&mut self, message: ChatMessage) -> usize {
         self.messages.push(message);
         self.messages.len() - 1
     }
@@ -216,5 +216,79 @@ impl State {
         let message_type = MessageType::System(content, SystemMessageType::Error);
         let message = ChatMessage::new("Termchat: ".into(), message_type);
         self.messages.push(message);
+    }
+
+    pub fn progress_start(&mut self, id: usize) {
+        self.messages.push(ChatMessage::new(
+            "Sending".into(),
+            MessageType::Progress(ProgressState::Started(id)),
+        ))
+    }
+
+    pub fn progress_pulse(&mut self, id: usize, file_size: u64, bytes_read: u64) {
+        for msg in self.messages.iter_mut().rev() {
+            match &msg.message_type {
+                MessageType::Progress(ProgressState::Started(msg_id)) => {
+                    if msg_id == &id {
+                        msg.message_type = MessageType::Progress(ProgressState::Working(
+                            id, file_size, bytes_read,
+                        ));
+                        break
+                    }
+                }
+                // same file_size
+                MessageType::Progress(ProgressState::Working(msg_id, _, current_bytes)) => {
+                    if msg_id == &id {
+                        msg.message_type = MessageType::Progress(ProgressState::Working(
+                            id,
+                            file_size,
+                            current_bytes + bytes_read,
+                        ));
+                        break
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    pub fn progress_stop(&mut self, id: usize) {
+        for msg in self.messages.iter_mut().rev() {
+            match &msg.message_type {
+                MessageType::Progress(ProgressState::Started(msg_id)) => {
+                    if msg_id == &id {
+                        msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
+                        break
+                    }
+                }
+                // same file_size
+                MessageType::Progress(ProgressState::Working(msg_id, _, current_bytes)) => {
+                    if msg_id == &id {
+                        msg.message_type =
+                            MessageType::Progress(ProgressState::Stopped(*current_bytes));
+                        break
+                    }
+                }
+                _ => (),
+            }
+        }
+    }
+
+    pub fn progress_stop_last(&mut self) {
+        for msg in self.messages.iter_mut().rev() {
+            match &msg.message_type {
+                MessageType::Progress(ProgressState::Started(_)) => {
+                    msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
+                    break
+                }
+                // same file_size
+                MessageType::Progress(ProgressState::Working(_, _, current_bytes)) => {
+                    msg.message_type =
+                        MessageType::Progress(ProgressState::Stopped(*current_bytes));
+                    break
+                }
+                _ => (),
+            }
+        }
     }
 }

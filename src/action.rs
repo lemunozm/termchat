@@ -1,5 +1,4 @@
 use crate::state::{State};
-use crate::util::{Result};
 
 use message_io::network::{NetworkManager};
 
@@ -9,5 +8,5 @@ pub enum Processing {
 }
 
 pub trait Action: Send {
-    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Result<Processing>;
+    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Processing;
 }

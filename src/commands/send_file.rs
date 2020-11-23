@@ -1,15 +1,15 @@
 use crate::action::{Action, Processing};
 use crate::commands::{Command};
 use crate::state::{State};
+use crate::message::{NetMessage, Chunk};
 use crate::util::{Result};
 
 use message_io::network::{NetworkManager};
 
 use std::path::{Path};
+use std::io::{Read};
 
-pub struct SendFileCommand {
-
-}
+pub struct SendFileCommand;
 
 impl Command for SendFileCommand {
     fn name(&self) -> &'static str {
@@ -25,16 +25,17 @@ impl Command for SendFileCommand {
     }
 }
 
+
 pub struct SendFile {
     file: std::fs::File,
-    //id: usize,
     file_name: String,
-    //data: Vec<u8>,
-    //bytes_read: usize,
     file_size: u64,
+    progress_id: Option<usize>,
 }
 
 impl SendFile {
+    const CHUNK_SIZE: usize = 65536;
+
     pub fn new(file_path: &str) -> Result<SendFile> {
         const READ_FILENAME_ERROR: &str = "Unable to read file name";
         let file_path = Path::new(file_path);
@@ -51,57 +52,40 @@ impl SendFile {
         Ok(SendFile {
             file,
             file_name,
-            file_size
+            file_size,
+            progress_id: None,
         })
     }
 }
 
 impl Action for SendFile {
-    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Result<Processing> {
-        /*
+    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Processing {
+        if self.progress_id.is_none() {
+            self.progress_id = Some(0);
+            state.progress_start(0);
+        }
 
-        let send_id = self.id;
-        (self.callback)(file, file_name, file_size, send_id);
-        self.id += 1;
+        let mut data = Vec::with_capacity(Self::CHUNK_SIZE);
+        let (chunk, processing) = match self.file.read(&mut data) {
+            Ok(0) => {
+                state.progress_stop(0);
+                (Chunk::End, Processing::Completed)
+            }
+            Ok(_) => {
+                state.progress_pulse(0, self.file_size, data.len() as u64);
+                (Chunk::Data(data), Processing::Partial)
+            }
+            Err(error) => {
+                state.progress_stop_last();
+                let msg = format!("Error sending file. error: {}", error);
+                state.add_system_error_message(msg);
+                (Chunk::Error, Processing::Completed)
+            }
+        };
 
-        self.state.progress_start(send_id);
-        */
-        Err("".into())
+        let message = NetMessage::UserData(self.file_name.clone(), chunk);
+        network.send_all(state.all_user_endpoints(), message).ok(); //Best effort
+
+        processing
     }
 }
-                /*
-                Event::ReadFile(chunk) => {
-                    let try_send = || -> Result<()> {
-                        let Chunk { file, id, file_name, data, bytes_read, file_size } = chunk?;
-
-                        self.network
-                            .send_all(
-                                self.state.all_user_endpoints(),
-                                NetMessage::UserData(
-                                    file_name.clone(),
-                                    Some((data, bytes_read)),
-                                    None,
-                                ),
-                            )
-                            .map_err(util::stringify_sendall_errors)?;
-
-                        if bytes_read == 0 {
-                            self.state.progress_stop(id);
-                        }
-                        else {
-                            self.state.progress_pulse(id, file_size, bytes_read);
-                            let chunk = read_file(file, file_name, file_size, id);
-                            self.event_queue.sender().send(Event::ReadFile(chunk));
-                        }
-                        Ok(())
-                    };
-
-                    if let Err(e) = try_send() {
-                        // we dont have the file_name here
-                        // we'll just stop the last progress
-                        self.state.progress_stop_last();
-                        let msg = format!("Error sending file. error: {}", e);
-                        self.state.add_system_message(msg, SystemMessageType::Error);
-                    }
-                }
-                */
