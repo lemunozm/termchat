@@ -1,6 +1,9 @@
-use crate::commands::{Command, Action, Processing};
+use crate::action::{Action, Processing};
+use crate::commands::{Command};
 use crate::state::{State};
 use crate::util::{Result};
+
+use message_io::network::{NetworkManager};
 
 use std::path::{Path};
 
@@ -54,7 +57,7 @@ impl SendFile {
 }
 
 impl Action for SendFile {
-    fn process(&mut self, state: &mut State) -> Result<Processing> {
+    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Result<Processing> {
         /*
 
         let send_id = self.id;
@@ -66,3 +69,39 @@ impl Action for SendFile {
         Err("".into())
     }
 }
+                /*
+                Event::ReadFile(chunk) => {
+                    let try_send = || -> Result<()> {
+                        let Chunk { file, id, file_name, data, bytes_read, file_size } = chunk?;
+
+                        self.network
+                            .send_all(
+                                self.state.all_user_endpoints(),
+                                NetMessage::UserData(
+                                    file_name.clone(),
+                                    Some((data, bytes_read)),
+                                    None,
+                                ),
+                            )
+                            .map_err(util::stringify_sendall_errors)?;
+
+                        if bytes_read == 0 {
+                            self.state.progress_stop(id);
+                        }
+                        else {
+                            self.state.progress_pulse(id, file_size, bytes_read);
+                            let chunk = read_file(file, file_name, file_size, id);
+                            self.event_queue.sender().send(Event::ReadFile(chunk));
+                        }
+                        Ok(())
+                    };
+
+                    if let Err(e) = try_send() {
+                        // we dont have the file_name here
+                        // we'll just stop the last progress
+                        self.state.progress_stop_last();
+                        let msg = format!("Error sending file. error: {}", e);
+                        self.state.add_system_message(msg, SystemMessageType::Error);
+                    }
+                }
+                */

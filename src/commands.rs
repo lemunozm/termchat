@@ -1,18 +1,9 @@
 pub mod send_file;
 
-use crate::state::{State};
+use crate::action::{Action};
 use crate::util::{Result};
 
 use std::collections::{HashMap};
-
-pub enum Processing {
-    Completed,
-    Partial,
-}
-
-pub trait Action: Send {
-    fn process(&mut self, state: &mut State) -> Result<Processing>;
-}
 
 pub trait Command {
     fn name(&self) -> &'static str;

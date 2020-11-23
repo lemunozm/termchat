@@ -12,7 +12,7 @@ pub type MessageId = usize;
 #[derive(PartialEq)]
 pub enum SystemMessageType {
     Error,
-    Notification,
+    Info,
 }
 
 pub enum MessageType {
@@ -206,8 +206,14 @@ impl State {
         self.messages.len() - 1
     }
 
-    pub fn add_system_message(&mut self, content: String, msg_type: SystemMessageType) {
-        let message_type = MessageType::System(content, msg_type);
+    pub fn add_system_info_message(&mut self, content: String) {
+        let message_type = MessageType::System(content, SystemMessageType::Info);
+        let message = ChatMessage::new("Termchat: ".into(), message_type);
+        self.messages.push(message);
+    }
+
+    pub fn add_system_error_message(&mut self, content: String) {
+        let message_type = MessageType::System(content, SystemMessageType::Error);
         let message = ChatMessage::new("Termchat: ".into(), message_type);
         self.messages.push(message);
     }

@@ -66,7 +66,7 @@ fn draw_messages_panel(
                 }
                 MessageType::System(content, msg_type) => {
                     let (user_color, content_color) = match msg_type {
-                        SystemMessageType::Notification => (Color::Yellow, Color::LightYellow),
+                        SystemMessageType::Info => (Color::Yellow, Color::LightYellow),
                         SystemMessageType::Error => (Color::Red, Color::LightRed),
                     };
                     Spans::from(vec![

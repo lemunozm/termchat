@@ -1,23 +1,18 @@
-use super::state::{
-    State, CursorMovement, ChatMessage, MessageType, ScrollMovement, SystemMessageType,
-};
-use crate::terminal_events::TerminalEventCollector;
+use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
+use crate::terminal_events::{TerminalEventCollector};
 use crate::renderer::{Renderer};
-use crate::commands::{CommandManager, Action, Processing};
+use crate::action::{Action, Processing};
+use crate::commands::{CommandManager};
 use crate::util::{self, Error, Result};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
-use message_io::events::EventQueue;
+use message_io::events::{EventQueue};
 use message_io::network::{NetEvent, NetworkManager, Endpoint};
 
 use serde::{Deserialize, Serialize};
 
 use std::net::{SocketAddrV4};
-
-//mod read_event;
-
-//use read_event::{read_file, Chunk, ReadFile};
 
 #[derive(Serialize, Deserialize)]
 enum NetMessage {
@@ -63,18 +58,12 @@ impl<'a> Application<'a> {
         });
 
         let sender = event_queue.sender().clone(); // Collect terminal events
-        let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
-            Ok(event) => sender.send(Event::Terminal(event)),
-            Err(e) => sender.send(Event::Close(Some(e))),
+        let _terminal_events = TerminalEventCollector::new(move |term_event| {
+            match term_event {
+                Ok(event) => sender.send(Event::Terminal(event)),
+                Err(e) => sender.send(Event::Close(Some(e))),
+            }
         })?;
-
-        /*
-        let sender = event_queue.sender().clone(); // Collect read_file events
-        let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
-            let chunk = read_file(file, file_name, file_size, id);
-            sender.send(Event::ReadFile(chunk));
-        }));
-        */
 
         Ok(Application {
             config,
@@ -101,42 +90,6 @@ impl<'a> Application<'a> {
 
         loop {
             match self.event_queue.receive() {
-                /*
-                Event::ReadFile(chunk) => {
-                    let try_send = || -> Result<()> {
-                        let Chunk { file, id, file_name, data, bytes_read, file_size } = chunk?;
-
-                        self.network
-                            .send_all(
-                                self.state.all_user_endpoints(),
-                                NetMessage::UserData(
-                                    file_name.clone(),
-                                    Some((data, bytes_read)),
-                                    None,
-                                ),
-                            )
-                            .map_err(util::stringify_sendall_errors)?;
-
-                        if bytes_read == 0 {
-                            self.state.progress_stop(id);
-                        }
-                        else {
-                            self.state.progress_pulse(id, file_size, bytes_read);
-                            let chunk = read_file(file, file_name, file_size, id);
-                            self.event_queue.sender().send(Event::ReadFile(chunk));
-                        }
-                        Ok(())
-                    };
-
-                    if let Err(e) = try_send() {
-                        // we dont have the file_name here
-                        // we'll just stop the last progress
-                        self.state.progress_stop_last();
-                        let msg = format!("Error sending file. error: {}", e);
-                        self.state.add_system_message(msg, SystemMessageType::Error);
-                    }
-                }
-                */
                 Event::Network(net_event) => match net_event {
                     NetEvent::Message(endpoint, message) => {
                         self.process_network_message(endpoint, message);
@@ -178,7 +131,7 @@ impl<'a> Application<'a> {
                         Ok(())
                     };
                     if let Err(e) = try_connect() {
-                        self.state.add_system_message(e.to_string(), SystemMessageType::Error);
+                        self.state.add_system_error_message(e.to_string());
                     }
                 }
             }
@@ -215,31 +168,36 @@ impl<'a> Application<'a> {
                                 "Successfully received file {} from user {} !",
                                 file_name, user
                             );
-                            self.state.add_system_message(msg, SystemMessageType::Notification);
+                            self.state.add_system_info_message(msg);
                             return Ok(())
                         }
 
-                        let path = std::env::temp_dir().join("termchat");
-                        let user_path = path.join(&user);
-                        // Ignore already exists error
-                        let _ = std::fs::create_dir_all(&user_path);
+                        let user_path = std::env::temp_dir().join("termchat").join(&user);
+
+                        match std::fs::create_dir_all(&user_path) {
+                            Ok(_) => (),
+                            Err(ref err) if err.kind() == std::io::ErrorKind::Interrupted => (),
+                            Err(e) => Err(e)?,
+                        }
+
                         let file_path = user_path.join(file_name);
 
-                        let mut file = std::fs::OpenOptions::new()
+                        std::fs::OpenOptions::new()
                             .create(true)
                             .append(true)
-                            .open(file_path)?;
-                        file.write_all(&data)?;
+                            .open(file_path)?
+                            .write_all(&data)?;
+
                         Ok(())
                     };
 
-                    if let Err(e) = try_write() {
+                    if let Err(error) = try_write() {
                         let message = format!(
                             "termchat: Failed to write data sent from user: {}",
                             user
                         );
-                        self.state.add_system_message(message, SystemMessageType::Error);
-                        self.state.add_system_message(e.to_string(), SystemMessageType::Error);
+                        self.state.add_system_error_message(message);
+                        self.state.add_system_error_message(error.to_string());
                     }
                 }
             }
@@ -267,10 +225,7 @@ impl<'a> Application<'a> {
                         let should_send = match self.commands.find_command_action(&input) {
                             Some(Ok(action)) => self.process_action(action),
                             Some(Err(e)) => {
-                                self.state.add_system_message(
-                                    e.to_string(),
-                                    SystemMessageType::Error
-                                );
+                                self.state.add_system_error_message(e.to_string());
                                 false
                             }
                             None => true,
@@ -293,7 +248,7 @@ impl<'a> Application<'a> {
                                 },
                                 Err(e) => {
                                     let errors = util::stringify_sendall_errors(e);
-                                    self.state.add_system_message(errors, SystemMessageType::Error);
+                                    self.state.add_system_error_message(errors);
                                 }
                             }
                         }
@@ -332,14 +287,14 @@ impl<'a> Application<'a> {
     }
 
     fn process_action(&mut self, mut action: Box<dyn Action>) -> bool {
-        match action.process(&mut self.state) {
+        match action.process(&mut self.state, &mut self.network) {
             Ok(Processing::Completed) => true,
             Ok(Processing::Partial) => {
                 self.event_queue.sender().send(Event::Action(action));
                 true
             }
             Err(error) => {
-                self.state.add_system_message(error.to_string(), SystemMessageType::Error);
+                self.state.add_system_error_message(error.to_string());
                 false
             }
         }
