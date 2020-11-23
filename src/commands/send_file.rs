@@ -61,27 +61,26 @@ impl SendFile {
 impl Action for SendFile {
     fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Processing {
         if self.progress_id.is_none() {
-            self.progress_id = Some(0);
-            state.progress_start(0);
+            let id = state.add_progress_message(&self.file_name, self.file_size);
+            self.progress_id = Some(id);
         }
 
         let mut data = Vec::with_capacity(Self::CHUNK_SIZE);
-        let (chunk, processing) = match self.file.read(&mut data) {
+        let (bytes_read, chunk, processing) = match self.file.read(&mut data) {
             Ok(0) => {
-                state.progress_stop(0);
-                (Chunk::End, Processing::Completed)
+                (0, Chunk::End, Processing::Completed)
             }
             Ok(_) => {
-                state.progress_pulse(0, self.file_size, data.len() as u64);
-                (Chunk::Data(data), Processing::Partial)
+                (data.len(), Chunk::Data(data), Processing::Partial)
             }
             Err(error) => {
-                state.progress_stop_last();
                 let msg = format!("Error sending file. error: {}", error);
                 state.add_system_error_message(msg);
-                (Chunk::Error, Processing::Completed)
+                (0, Chunk::Error, Processing::Completed)
             }
         };
+
+        state.progress_message_update(self.progress_id.unwrap(), bytes_read as u64);
 
         let message = NetMessage::UserData(self.file_name.clone(), chunk);
         network.send_all(state.all_user_endpoints(), message).ok(); //Best effort

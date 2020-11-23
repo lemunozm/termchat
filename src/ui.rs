@@ -1,4 +1,4 @@
-use super::state::{progress::ProgressState, State, MessageType, SystemMessageType};
+use super::state::{ProgressState, State, MessageType, SystemMessageType};
 use super::util::{split_each};
 
 use tui::backend::CrosstermBackend;
@@ -97,8 +97,8 @@ fn draw_messages_panel(
 fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
     let (title, current, max) = match progress {
         ProgressState::Started(_) => ("Pending: ", 0, 0),
-        ProgressState::Working(_, max, current) => ("Sending: ", *current, *max),
-        ProgressState::Stopped(max) => ("Done! ", *max, *max),
+        ProgressState::Working(max, current) => ("Sending: ", *current, *max),
+        ProgressState::Completed => ("Done! ", 100, 100),
     };
 
     let color = Color::LightGreen;

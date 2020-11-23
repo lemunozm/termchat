@@ -1,7 +1,3 @@
-pub mod progress;
-
-use progress::{ProgressBar, ProgressState};
-
 use message_io::network::Endpoint;
 
 use chrono::{DateTime, Local};
@@ -13,6 +9,13 @@ use std::collections::HashMap;
 pub enum SystemMessageType {
     Error,
     Info,
+}
+
+#[derive(PartialEq)]
+pub enum ProgressState {
+    Started(u64),      // file_size
+    Working(u64, u64), // file_size, current_bytes
+    Completed,
 }
 
 pub enum MessageType {
@@ -201,9 +204,8 @@ impl State {
         None
     }
 
-    pub fn add_message(&mut self, message: ChatMessage) -> usize {
+    pub fn add_message(&mut self, message: ChatMessage) {
         self.messages.push(message);
-        self.messages.len() - 1
     }
 
     pub fn add_system_info_message(&mut self, content: String) {
@@ -218,77 +220,33 @@ impl State {
         self.messages.push(message);
     }
 
-    pub fn progress_start(&mut self, id: usize) {
-        self.messages.push(ChatMessage::new(
-            "Sending".into(),
-            MessageType::Progress(ProgressState::Started(id)),
-        ))
+    pub fn add_progress_message(&mut self, file_name: &str, total: u64) -> usize {
+        let message = ChatMessage::new(
+            format!("Sending '{}'", file_name),
+            MessageType::Progress(ProgressState::Started(total)),
+        );
+        self.messages.push(message);
+        self.messages.len() - 1
     }
 
-    pub fn progress_pulse(&mut self, id: usize, file_size: u64, bytes_read: u64) {
-        for msg in self.messages.iter_mut().rev() {
-            match &msg.message_type {
-                MessageType::Progress(ProgressState::Started(msg_id)) => {
-                    if msg_id == &id {
-                        msg.message_type = MessageType::Progress(ProgressState::Working(
-                            id, file_size, bytes_read,
-                        ));
-                        break
+    pub fn progress_message_update(&mut self, index: usize, increment: u64) {
+        match &self.messages[index].message_type {
+            MessageType::Progress(state) => {
+                match state {
+                    ProgressState::Started(total) => ProgressState::Working(increment, *total),
+                    ProgressState::Working(current, total) => {
+                        let new_current = current + increment;
+                        if new_current == *total {
+                            ProgressState::Completed
+                        }
+                        else {
+                            ProgressState::Working(new_current, *total)
+                        }
                     }
-                }
-                // same file_size
-                MessageType::Progress(ProgressState::Working(msg_id, _, current_bytes)) => {
-                    if msg_id == &id {
-                        msg.message_type = MessageType::Progress(ProgressState::Working(
-                            id,
-                            file_size,
-                            current_bytes + bytes_read,
-                        ));
-                        break
-                    }
-                }
-                _ => (),
-            }
-        }
-    }
-
-    pub fn progress_stop(&mut self, id: usize) {
-        for msg in self.messages.iter_mut().rev() {
-            match &msg.message_type {
-                MessageType::Progress(ProgressState::Started(msg_id)) => {
-                    if msg_id == &id {
-                        msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
-                        break
-                    }
-                }
-                // same file_size
-                MessageType::Progress(ProgressState::Working(msg_id, _, current_bytes)) => {
-                    if msg_id == &id {
-                        msg.message_type =
-                            MessageType::Progress(ProgressState::Stopped(*current_bytes));
-                        break
-                    }
-                }
-                _ => (),
-            }
-        }
-    }
-
-    pub fn progress_stop_last(&mut self) {
-        for msg in self.messages.iter_mut().rev() {
-            match &msg.message_type {
-                MessageType::Progress(ProgressState::Started(_)) => {
-                    msg.message_type = MessageType::Progress(ProgressState::Stopped(0));
-                    break
-                }
-                // same file_size
-                MessageType::Progress(ProgressState::Working(_, _, current_bytes)) => {
-                    msg.message_type =
-                        MessageType::Progress(ProgressState::Stopped(*current_bytes));
-                    break
-                }
-                _ => (),
-            }
+                    ProgressState::Completed => ProgressState::Completed,
+                };
+            },
+            _ => panic!("Must be a Progress MessageType")
         }
     }
 }
