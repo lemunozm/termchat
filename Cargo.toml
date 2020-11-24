@@ -1,6 +1,6 @@
 [package]
 name = "termchat"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["lemunozm <lemunozm@gmail.com>"]
 description = "Distributed LAN chat application in the terminal"
 edition = "2018"

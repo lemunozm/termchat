@@ -1,5 +1,9 @@
 # Changelog
 
+## Release 1.1.1
+- Fixed minor visual printed line removed.
+- Fixed: If user write `? + <Enter>` now, not generate an error.
+
 ## Release 1.1.0
 - Send files command (thanks to sigmaSd)
 - Minor ui changes
