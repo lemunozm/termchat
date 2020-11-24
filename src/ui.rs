@@ -94,7 +94,6 @@ fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
     let (title, ui_current, ui_remaining) = match progress {
         ProgressState::Started(_) => ("Pending: ", 0, width),
         ProgressState::Working(total, current) => {
-            eprintln!("{}  {}", total, current);
             let percentage = *current as f64 / *total as f64;
             let ui_current = (percentage * width as f64) as usize;
             let ui_remaining = width - ui_current;
