@@ -64,8 +64,10 @@ You can set a custom tcp sever port with `-t <port>`
 ### Commands
 Termchat treats messages containings the following commands in a special way:
 
-- **`?send <$path_to_file>`**: sends the specified file to everyone on the network, exp: `?send ./myfile`
+- **`?send <$path_to_file>`**: sends the specified file to everyone on the network,
+  example: `?send ./myfile`
 
+  Note: The received files can be found in `/tmp/termchat/<termchat-username>/<file_name>`
 
 ## Frequently Asked Questions
 
