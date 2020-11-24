@@ -1,5 +1,9 @@
 # Changelog
 
+## Release 1.1.0
+- Send files command (thanks to sigmaSd)
+- Minor ui changes
+
 ## Release 1.0.0
 - Fixed a network issue that made peers not discoverable through LAN.
 - Added utf8 support.
