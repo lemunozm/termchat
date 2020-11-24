@@ -22,19 +22,12 @@ pub fn split_each(input: String, width: usize) -> Vec<String> {
     splitted
 }
 
-// Termchat messages convenience function
-use crate::state::{LogMessage, MessageType, TermchatMessageType};
-pub fn termchat_message(content: String, msg_type: TermchatMessageType) -> LogMessage {
-    LogMessage::new(
-        "Termchat: ".into(),
-        MessageType::Termchat(content, msg_type),
-    )
-}
-
 // Errors
 pub type Error = Box<dyn std::error::Error + Send + Sync>;
 pub type Result<T> = std::result::Result<T, Error>;
 
+/*
+//TODO: Should send the file even if some endpoint of send_all gives an error.
 pub fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, std::io::Error)>) -> String {
     let mut out = String::new();
     for (endpoint, error) in e {
@@ -48,3 +41,4 @@ pub fn stringify_sendall_errors(e: Vec<(message_io::network::Endpoint, std::io::
     }
     out
 }
+*/

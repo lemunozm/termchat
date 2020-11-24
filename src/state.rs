@@ -4,41 +4,43 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
-pub mod progress;
-use progress::ProgressState;
+#[derive(PartialEq)]
+pub enum SystemMessageType {
+    Info,
+    #[allow(dead_code)]
+    Warning,
+    Error,
+}
+
+#[derive(PartialEq)]
+pub enum ProgressState {
+    Started(u64),      // file_size
+    Working(u64, u64), // file_size, current_bytes
+    Completed,
+}
 
 pub enum MessageType {
     Connection,
     Disconnection,
-    Content(String),
-    Termchat(String, TermchatMessageType),
+    Text(String),
+    System(String, SystemMessageType),
     Progress(ProgressState),
 }
 
-#[derive(PartialEq)]
-pub enum TermchatMessageType {
-    Error,
-    Notification,
-}
-
-pub struct LogMessage {
+pub struct ChatMessage {
     pub date: DateTime<Local>,
     pub user: String,
     pub message_type: MessageType,
 }
 
-impl LogMessage {
-    pub fn new(user: String, message_type: MessageType) -> LogMessage {
-        LogMessage {
-            date: Local::now(),
-            user,
-            message_type,
-        }
+impl ChatMessage {
+    pub fn new(user: String, message_type: MessageType) -> ChatMessage {
+        ChatMessage { date: Local::now(), user, message_type }
     }
 }
 
-pub struct ApplicationState {
-    messages: Vec<LogMessage>,
+pub struct State {
+    messages: Vec<ChatMessage>,
     scroll_messages_view: usize,
     input: Vec<char>,
     input_cursor: usize,
@@ -60,9 +62,9 @@ pub enum ScrollMovement {
     Start,
 }
 
-impl ApplicationState {
-    pub fn new() -> ApplicationState {
-        ApplicationState {
+impl State {
+    pub fn new() -> State {
+        State {
             messages: Vec::new(),
             scroll_messages_view: 0,
             input: vec![],
@@ -73,7 +75,7 @@ impl ApplicationState {
         }
     }
 
-    pub fn messages(&self) -> &Vec<LogMessage> {
+    pub fn messages(&self) -> &Vec<ChatMessage> {
         &self.messages
     }
 
@@ -129,14 +131,14 @@ impl ApplicationState {
             self.users_id.insert(user.into(), self.last_user_id);
         }
         self.last_user_id += 1;
-        self.add_message(LogMessage::new(user.into(), MessageType::Connection));
+        self.add_message(ChatMessage::new(user.into(), MessageType::Connection));
     }
 
     pub fn disconnected_user(&mut self, endpoint: Endpoint) {
         if self.lan_users.contains_key(&endpoint) {
             // unwrap is safe because of the check above
             let user = self.lan_users.remove(&endpoint).unwrap();
-            self.add_message(LogMessage::new(user, MessageType::Disconnection));
+            self.add_message(ChatMessage::new(user, MessageType::Disconnection));
         }
     }
 
@@ -198,12 +200,54 @@ impl ApplicationState {
     pub fn reset_input(&mut self) -> Option<String> {
         if !self.input.is_empty() {
             self.input_cursor = 0;
-            return Some(self.input.drain(..).collect());
+            return Some(self.input.drain(..).collect())
         }
         None
     }
 
-    pub fn add_message(&mut self, message: LogMessage) {
+    pub fn add_message(&mut self, message: ChatMessage) {
         self.messages.push(message);
+    }
+
+    pub fn add_system_info_message(&mut self, content: String) {
+        let message_type = MessageType::System(content, SystemMessageType::Info);
+        let message = ChatMessage::new("Termchat: ".into(), message_type);
+        self.messages.push(message);
+    }
+
+    pub fn add_system_error_message(&mut self, content: String) {
+        let message_type = MessageType::System(content, SystemMessageType::Error);
+        let message = ChatMessage::new("Termchat: ".into(), message_type);
+        self.messages.push(message);
+    }
+
+    pub fn add_progress_message(&mut self, file_name: &str, total: u64) -> usize {
+        let message = ChatMessage::new(
+            format!("Sending '{}'", file_name),
+            MessageType::Progress(ProgressState::Started(total)),
+        );
+        self.messages.push(message);
+        self.messages.len() - 1
+    }
+
+    pub fn progress_message_update(&mut self, index: usize, increment: u64) {
+        match &mut self.messages[index].message_type {
+            MessageType::Progress(ref mut state) => {
+                *state = match state {
+                    ProgressState::Started(total) => ProgressState::Working(*total, increment),
+                    ProgressState::Working(total, current) => {
+                        let new_current = *current + increment;
+                        if new_current == *total {
+                            ProgressState::Completed
+                        }
+                        else {
+                            ProgressState::Working(*total, new_current)
+                        }
+                    }
+                    ProgressState::Completed => ProgressState::Completed,
+                };
+            }
+            _ => panic!("Must be a Progress MessageType"),
+        }
     }
 }

@@ -1,69 +1,47 @@
-use super::state::{
-    ApplicationState, CursorMovement, LogMessage, MessageType, ScrollMovement, TermchatMessageType,
-};
-use super::terminal_events::TerminalEventCollector;
-use super::ui::{self};
-use crate::util::{stringify_sendall_errors, termchat_message, Error, Result};
+use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
+use crate::terminal_events::{TerminalEventCollector};
+use crate::renderer::{Renderer};
+use crate::action::{Action, Processing};
+use crate::commands::{CommandManager};
+use crate::message::{NetMessage, Chunk};
+use crate::util::{Error, Result};
+use crate::commands::send_file::{SendFileCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
-use crossterm::{
-    terminal::{self},
-    ExecutableCommand,
-};
 
-use tui::backend::CrosstermBackend;
-use tui::Terminal;
+use message_io::events::{EventQueue};
+use message_io::network::{NetEvent, NetworkManager, Endpoint};
 
-use message_io::events::EventQueue;
-use message_io::network::{NetEvent, NetworkManager};
-
-use serde::{Deserialize, Serialize};
-
-use std::io::{self, Stdout};
-use std::net::SocketAddr;
-
-mod commands;
-mod read_event;
-
-use read_event::{read_file, Chunk, ReadFile};
-
-#[derive(Serialize, Deserialize)]
-enum NetMessage {
-    HelloLan(String, u16), // user_name, server_port
-    HelloUser(String),     // user_name
-    UserMessage(String),   // content
-    UserData(String, Option<(Vec<u8>, usize)>, Option<String>), // file_name, Option<data, bytes_read>, Option<Error>
-}
+use std::net::{SocketAddrV4};
+use std::io::{ErrorKind};
 
 enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
-    ReadFile(Result<Chunk>),
+    Action(Box<dyn Action>),
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
 }
 
-pub struct Application {
-    event_queue: EventQueue<Event>,
-    network: NetworkManager,
-    terminal: Terminal<CrosstermBackend<Stdout>>,
-    read_file_ev: ReadFile,
-    _terminal_events: TerminalEventCollector,
-    discovery_addr: SocketAddr,
-    tcp_server_addr: SocketAddr,
-    user_name: String,
+pub struct Config {
+    pub discovery_addr: SocketAddrV4,
+    pub tcp_server_port: u16,
+    pub user_name: String,
 }
 
-impl Application {
-    pub fn new(
-        discovery_addr: SocketAddr,
-        tcp_server_port: u16,
-        user_name: &str,
-    ) -> Result<Application> {
-        // Guard to make sure to cleanup if a failure happens in the next lines
-        let _g = Guard;
+pub struct Application<'a> {
+    config: &'a Config,
+    state: State,
+    network: NetworkManager,
+    commands: CommandManager,
+    //read_file_ev: ReadFile,
+    _terminal_events: TerminalEventCollector,
+    event_queue: EventQueue<Event>,
+}
 
+impl<'a> Application<'a> {
+    pub fn new(config: &'a Config) -> Result<Application<'a>> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
@@ -75,296 +53,213 @@ impl Application {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
-        let sender = event_queue.sender().clone(); // Collect read_file events
-        let read_file_ev = ReadFile::new(Box::new(move |file, file_name, file_size, id| {
-            let chunk = read_file(file, file_name, file_size, id);
-            sender.send(Event::ReadFile(chunk));
-        }));
-
-        terminal::enable_raw_mode()?;
-        io::stdout().execute(terminal::EnterAlternateScreen)?;
-        let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
-
-        let tcp_server_addr = ([0, 0, 0, 0], tcp_server_port).into();
-
-        std::mem::forget(_g);
-
         Ok(Application {
-            event_queue,
+            config,
+            state: State::new(),
             network,
-            terminal,
-            read_file_ev,
-            // Stored because we want its internal thread functionality until the Application was dropped
+            commands: CommandManager::default().with(SendFileCommand),
+            // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
-            discovery_addr,
-            tcp_server_addr,
-            user_name: user_name.into(),
+            event_queue,
         })
     }
 
     pub fn run(&mut self) -> Result<()> {
-        let mut state = ApplicationState::new();
-        ui::draw(&mut self.terminal, &state)?;
+        let mut renderer = Renderer::new()?;
+        renderer.render(&self.state)?;
 
-        let (_, server_addr) = self.network.listen_tcp(self.tcp_server_addr)?;
-        let server_port = server_addr.port();
+        let server_addr = ("0.0.0.0", self.config.tcp_server_port);
+        let (_, server_addr) = self.network.listen_tcp(server_addr)?;
+        self.network.listen_udp_multicast(self.config.discovery_addr)?;
 
-        self.network.listen_udp_multicast(self.discovery_addr)?;
-
-        let discovery_endpoint = self.network.connect_udp(self.discovery_addr)?;
-
-        let message = NetMessage::HelloLan(self.user_name.clone(), server_port);
+        let discovery_endpoint = self.network.connect_udp(self.config.discovery_addr)?;
+        let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
         self.network.send(discovery_endpoint, message)?;
 
         loop {
             match self.event_queue.receive() {
-                Event::ReadFile(chunk) => {
-                    let try_send = || -> Result<()> {
-                        let Chunk {
-                            file,
-                            id,
-                            file_name,
-                            data,
-                            bytes_read,
-                            file_size,
-                        } = chunk?;
-
-                        self.network
-                            .send_all(
-                                state.all_user_endpoints(),
-                                NetMessage::UserData(
-                                    file_name.clone(),
-                                    Some((data, bytes_read)),
-                                    None,
-                                ),
-                            )
-                            .map_err(stringify_sendall_errors)?;
-
-                        if bytes_read == 0 {
-                            state.progress_stop(id);
-                        } else {
-                            state.progress_pulse(id, file_size, bytes_read);
-                            let chunk = read_file(file, file_name, file_size, id);
-                            self.event_queue.sender().send(Event::ReadFile(chunk));
-                        }
-                        Ok(())
-                    };
-
-                    if let Err(e) = try_send() {
-                        // we dont have the file_name here
-                        // we'll just stop the last progress
-                        state.progress_stop_last();
-                        let msg = format!("Error sending file. error: {}", e);
-                        state.add_message(termchat_message(msg, TermchatMessageType::Error));
-                    }
-                }
                 Event::Network(net_event) => match net_event {
-                    NetEvent::Message(endpoint, message) => match message {
-                        // by udp (multicast):
-                        NetMessage::HelloLan(user, server_port) => {
-                            let server_addr = (endpoint.addr().ip(), server_port);
-                            if user != self.user_name {
-                                let mut try_connect = || -> Result<()> {
-                                    let user_endpoint = self.network.connect_tcp(server_addr)?;
-                                    let message = NetMessage::HelloUser(self.user_name.clone());
-                                    self.network.send(user_endpoint, message)?;
-                                    state.connected_user(user_endpoint, &user);
-                                    Ok(())
-                                };
-                                if let Err(e) = try_connect() {
-                                    let message =
-                                        termchat_message(e.to_string(), TermchatMessageType::Error);
-                                    state.add_message(message);
-                                }
-                            }
-                        }
-                        // by tcp:
-                        NetMessage::HelloUser(user) => {
-                            state.connected_user(endpoint, &user);
-                        }
-                        NetMessage::UserMessage(content) => {
-                            if let Some(user) = state.user_name(endpoint) {
-                                let message =
-                                    LogMessage::new(user.into(), MessageType::Content(content));
-                                state.add_message(message);
-                            }
-                        }
-                        NetMessage::UserData(file_name, maybe_data, maybe_error) => {
-                            use std::io::Write;
-                            if state.user_name(endpoint).is_some() {
-                                // safe unwrap due to check
-                                let user = state.user_name(endpoint).unwrap().to_owned();
-
-                                let try_write = || -> Result<()> {
-                                    if let Some(error) = maybe_error {
-                                        return Err(format!(
-                                            "{} encountred an error while sending {}, error: {}",
-                                            user, file_name, error
-                                        )
-                                        .into());
-                                    }
-                                    // if the error is none we know that maybe_data is some
-                                    let (data, bytes_read) = maybe_data.unwrap();
-
-                                    //done
-                                    if bytes_read == 0 {
-                                        let msg = format!(
-                                            "Successfully received file {} from user {} !",
-                                            file_name, user
-                                        );
-                                        let msg = termchat_message(
-                                            msg,
-                                            TermchatMessageType::Notification,
-                                        );
-                                        state.add_message(msg);
-                                        return Ok(());
-                                    }
-
-                                    let path = std::env::temp_dir().join("termchat");
-                                    let user_path = path.join(&user);
-                                    // Ignore already exists error
-                                    let _ = std::fs::create_dir_all(&user_path);
-                                    let file_path = user_path.join(file_name);
-
-                                    let mut file = std::fs::OpenOptions::new()
-                                        .create(true)
-                                        .append(true)
-                                        .open(file_path)?;
-                                    file.write_all(&data)?;
-                                    Ok(())
-                                };
-
-                                if let Err(e) = try_write() {
-                                    let message = format!(
-                                        "termchat: Failed to write data sent from user: {}",
-                                        user
-                                    );
-                                    state.add_message(termchat_message(
-                                        message,
-                                        TermchatMessageType::Error,
-                                    ));
-                                    state.add_message(termchat_message(
-                                        e.to_string(),
-                                        TermchatMessageType::Error,
-                                    ));
-                                }
-                            }
-                        }
-                    },
-                    NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) => {
-                        state.disconnected_user(endpoint);
+                    NetEvent::Message(endpoint, message) => {
+                        self.process_network_message(endpoint, message);
                     }
+                    NetEvent::AddedEndpoint(_) => (),
+                    NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
                 },
-                Event::Terminal(term_event) => match term_event {
-                    TermEvent::Key(KeyEvent { code, modifiers }) => match code {
-                        KeyCode::Esc => {
-                            self.event_queue
-                                .sender()
-                                .send_with_priority(Event::Close(None));
-                        }
-                        KeyCode::Char(character) => {
-                            if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
-                                self.event_queue
-                                    .sender()
-                                    .send_with_priority(Event::Close(None));
-                            } else {
-                                state.input_write(character);
-                            }
-                        }
-                        KeyCode::Enter => {
-                            if let Some(input) = state.reset_input() {
-                                let message = if let Err(e) = self.network.send_all(
-                                    state.all_user_endpoints(),
-                                    NetMessage::UserMessage(input.clone()),
-                                ) {
-                                    termchat_message(
-                                        stringify_sendall_errors(e),
-                                        TermchatMessageType::Error,
-                                    )
-                                } else {
-                                    LogMessage::new(
-                                        format!("{} (me)", self.user_name),
-                                        MessageType::Content(input.clone()),
-                                    )
-                                };
-
-                                state.add_message(message);
-
-                                if let Err(parse_error) = self.parse_input(&input, &mut state) {
-                                    state.add_message(termchat_message(
-                                        parse_error.to_string(),
-                                        TermchatMessageType::Error,
-                                    ));
-                                }
-                            }
-                        }
-                        KeyCode::Delete => {
-                            state.input_remove();
-                        }
-                        KeyCode::Backspace => {
-                            state.input_remove_previous();
-                        }
-                        KeyCode::Left => {
-                            state.input_move_cursor(CursorMovement::Left);
-                        }
-                        KeyCode::Right => {
-                            state.input_move_cursor(CursorMovement::Right);
-                        }
-                        KeyCode::Home => {
-                            state.input_move_cursor(CursorMovement::Start);
-                        }
-                        KeyCode::End => {
-                            state.input_move_cursor(CursorMovement::End);
-                        }
-                        KeyCode::Up => {
-                            state.messages_scroll(ScrollMovement::Up);
-                        }
-                        KeyCode::Down => {
-                            state.messages_scroll(ScrollMovement::Down);
-                        }
-                        KeyCode::PageUp => {
-                            state.messages_scroll(ScrollMovement::Start);
-                        }
-                        _ => (),
-                    },
-                    TermEvent::Mouse(_) => (),
-                    TermEvent::Resize(_, _) => (),
-                },
-                Event::Close(e) => {
-                    if let Some(error) = e {
-                        return Err(error);
-                    } else {
-                        return Ok(());
+                Event::Terminal(term_event) => {
+                    self.process_terminal_event(term_event);
+                }
+                Event::Action(action) => {
+                    self.process_action(action);
+                }
+                Event::Close(error) => {
+                    return match error {
+                        Some(error) => Err(error),
+                        None => Ok(()),
                     }
                 }
             }
-            ui::draw(&mut self.terminal, &state)?;
+            renderer.render(&self.state)?;
+        }
+        //Renderer is destroyed here and the terminal is recovered
+    }
+
+    fn process_network_message(&mut self, endpoint: Endpoint, message: NetMessage) {
+        match message {
+            // by udp (multicast):
+            NetMessage::HelloLan(user, server_port) => {
+                let server_addr = (endpoint.addr().ip(), server_port);
+                if user != self.config.user_name {
+                    let mut try_connect = || -> Result<()> {
+                        let user_endpoint = self.network.connect_tcp(server_addr)?;
+                        let message = NetMessage::HelloUser(self.config.user_name.clone());
+                        self.network.send(user_endpoint, message)?;
+                        self.state.connected_user(user_endpoint, &user);
+                        Ok(())
+                    };
+                    if let Err(e) = try_connect() {
+                        self.state.add_system_error_message(e.to_string());
+                    }
+                }
+            }
+            // by tcp:
+            NetMessage::HelloUser(user) => {
+                self.state.connected_user(endpoint, &user);
+            }
+            NetMessage::UserMessage(content) => {
+                if let Some(user) = self.state.user_name(endpoint) {
+                    let message = ChatMessage::new(user.into(), MessageType::Text(content));
+                    self.state.add_message(message);
+                }
+            }
+            NetMessage::UserData(file_name, chunk) => {
+                use std::io::Write;
+                if self.state.user_name(endpoint).is_some() {
+                    // safe unwrap due to check
+                    let user = self.state.user_name(endpoint).unwrap().to_owned();
+
+                    match chunk {
+                        Chunk::Error => {
+                            let msg =
+                                format!("'{}' had an error while sending '{}'", user, file_name);
+                            self.state.add_system_error_message(msg);
+                        }
+                        Chunk::End => {
+                            let msg = format!(
+                                "Successfully received file '{}' from user '{}'!",
+                                file_name, user
+                            );
+                            self.state.add_system_info_message(msg);
+                        }
+                        Chunk::Data(data) => {
+                            let try_write = || -> Result<()> {
+                                let user_path = std::env::temp_dir().join("termchat").join(&user);
+                                match std::fs::create_dir_all(&user_path) {
+                                    Ok(_) => (),
+                                    Err(ref err) if err.kind() == ErrorKind::AlreadyExists => (),
+                                    Err(e) => Err(e)?,
+                                }
+
+                                let file_path = user_path.join(file_name);
+                                std::fs::OpenOptions::new()
+                                    .create(true)
+                                    .append(true)
+                                    .open(file_path)?
+                                    .write_all(&data)?;
+
+                                Ok(())
+                            };
+
+                            if let Err(error) = try_write() {
+                                self.state.add_system_error_message(error.to_string());
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
-}
 
-impl Drop for Application {
-    fn drop(&mut self) {
-        clean_terminal();
+    fn process_terminal_event(&mut self, term_event: TermEvent) {
+        match term_event {
+            TermEvent::Mouse(_) => (),
+            TermEvent::Resize(_, _) => (),
+            TermEvent::Key(KeyEvent { code, modifiers }) => match code {
+                KeyCode::Esc => {
+                    self.event_queue.sender().send_with_priority(Event::Close(None));
+                }
+                KeyCode::Char(character) => {
+                    if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
+                        self.event_queue.sender().send_with_priority(Event::Close(None));
+                    }
+                    else {
+                        self.state.input_write(character);
+                    }
+                }
+                KeyCode::Enter => {
+                    if let Some(input) = self.state.reset_input() {
+                        match self.commands.find_command_action(&input).transpose() {
+                            Ok(action) => {
+                                let message = ChatMessage::new(
+                                    format!("{} (me)", self.config.user_name),
+                                    MessageType::Text(input.clone()),
+                                );
+                                self.state.add_message(message);
+
+                                self.network
+                                    .send_all(
+                                        self.state.all_user_endpoints(),
+                                        NetMessage::UserMessage(input.clone()),
+                                    )
+                                    .ok(); //Best effort
+
+                                if let Some(action) = action {
+                                    self.process_action(action)
+                                }
+                            }
+                            Err(error) => {
+                                self.state.add_system_error_message(error.to_string());
+                            }
+                        };
+                    }
+                }
+                KeyCode::Delete => {
+                    self.state.input_remove();
+                }
+                KeyCode::Backspace => {
+                    self.state.input_remove_previous();
+                }
+                KeyCode::Left => {
+                    self.state.input_move_cursor(CursorMovement::Left);
+                }
+                KeyCode::Right => {
+                    self.state.input_move_cursor(CursorMovement::Right);
+                }
+                KeyCode::Home => {
+                    self.state.input_move_cursor(CursorMovement::Start);
+                }
+                KeyCode::End => {
+                    self.state.input_move_cursor(CursorMovement::End);
+                }
+                KeyCode::Up => {
+                    self.state.messages_scroll(ScrollMovement::Up);
+                }
+                KeyCode::Down => {
+                    self.state.messages_scroll(ScrollMovement::Down);
+                }
+                KeyCode::PageUp => {
+                    self.state.messages_scroll(ScrollMovement::Start);
+                }
+                _ => (),
+            },
+        }
     }
-}
 
-struct Guard;
-impl Drop for Guard {
-    fn drop(&mut self) {
-        clean_terminal();
-    }
-}
-
-fn clean_terminal() {
-    io::stdout()
-        .execute(terminal::LeaveAlternateScreen)
-        .expect("Could not leave alternate screen");
-    terminal::disable_raw_mode().expect("Could not disable raw mode at exit");
-    if std::thread::panicking() {
-        eprintln!(
-            "termchat paniced, to log the error you can redirect stderror to a file, example: `termchat 2>termchat_log`"
-        );
+    fn process_action(&mut self, mut action: Box<dyn Action>) {
+        match action.process(&mut self.state, &mut self.network) {
+            Processing::Completed => (),
+            Processing::Partial => {
+                self.event_queue.sender().send(Event::Action(action));
+            }
+        }
     }
 }
