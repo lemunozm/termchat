@@ -19,15 +19,11 @@ impl Renderer {
         terminal::enable_raw_mode()?;
         io::stdout().execute(terminal::EnterAlternateScreen)?;
 
-        Ok(Renderer {
-            terminal: Terminal::new(CrosstermBackend::new(io::stdout()))?,
-        })
+        Ok(Renderer { terminal: Terminal::new(CrosstermBackend::new(io::stdout()))? })
     }
 
     pub fn render(&mut self, state: &State) -> Result<()> {
-        self.terminal.draw(|frame| {
-            ui::draw(frame, state, frame.size())
-        })?;
+        self.terminal.draw(|frame| ui::draw(frame, state, frame.size()))?;
         Ok(())
     }
 }

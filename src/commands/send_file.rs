@@ -25,7 +25,6 @@ impl Command for SendFileCommand {
     }
 }
 
-
 pub struct SendFile {
     file: std::fs::File,
     file_name: String,
@@ -49,12 +48,7 @@ impl SendFile {
         let file_size = std::fs::metadata(file_path)?.len();
         let file = std::fs::File::open(file_path)?;
 
-        Ok(SendFile {
-            file,
-            file_name,
-            file_size,
-            progress_id: None,
-        })
+        Ok(SendFile { file, file_name, file_size, progress_id: None })
     }
 }
 
@@ -67,12 +61,8 @@ impl Action for SendFile {
 
         let mut data = [0; Self::CHUNK_SIZE];
         let (bytes_read, chunk, processing) = match self.file.read(&mut data) {
-            Ok(0) => {
-                (0, Chunk::End, Processing::Completed)
-            }
-            Ok(bytes_read) => {
-                (bytes_read, Chunk::Data(data.to_vec()), Processing::Partial)
-            }
+            Ok(0) => (0, Chunk::End, Processing::Completed),
+            Ok(bytes_read) => (bytes_read, Chunk::Data(data.to_vec()), Processing::Partial),
             Err(error) => {
                 let msg = format!("Error sending file. error: {}", error);
                 state.add_system_error_message(msg);

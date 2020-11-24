@@ -11,11 +11,7 @@ use tui::{Frame};
 
 use std::io::Stdout;
 
-pub fn draw(
-    frame: &mut Frame<CrosstermBackend<Stdout>>,
-    state: &State,
-    chunk: Rect,
-) {
+pub fn draw(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &State, chunk: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
@@ -25,12 +21,7 @@ pub fn draw(
     draw_input_panel(frame, state, chunks[1]);
 }
 
-fn draw_messages_panel(
-    frame: &mut Frame<CrosstermBackend<Stdout>>,
-    state: &State,
-    chunk: Rect,
-)
-{
+fn draw_messages_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &State, chunk: Rect) {
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
@@ -144,12 +135,7 @@ fn parse_content(content: &str) -> Vec<Span> {
     }
 }
 
-fn draw_input_panel(
-    frame: &mut Frame<CrosstermBackend<Stdout>>,
-    state: &State,
-    chunk: Rect,
-)
-{
+fn draw_input_panel(frame: &mut Frame<CrosstermBackend<Stdout>>, state: &State, chunk: Rect) {
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();

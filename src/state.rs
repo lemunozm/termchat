@@ -4,7 +4,6 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
-
 #[derive(PartialEq)]
 pub enum SystemMessageType {
     Info,
@@ -247,8 +246,8 @@ impl State {
                     }
                     ProgressState::Completed => ProgressState::Completed,
                 };
-            },
-            _ => panic!("Must be a Progress MessageType")
+            }
+            _ => panic!("Must be a Progress MessageType"),
         }
     }
 }

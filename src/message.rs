@@ -14,4 +14,3 @@ pub enum NetMessage {
     UserMessage(String),     // content
     UserData(String, Chunk), // file_name, chunk
 }
-

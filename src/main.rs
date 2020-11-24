@@ -28,7 +28,7 @@ fn main() {
                 .default_value("238.255.0.1:5877")
                 .validator(|addr| match addr.parse::<SocketAddrV4>() {
                     Ok(_) => Ok(()),
-                    Err(_) => Err("The value must have syntax ipv4:port".into())
+                    Err(_) => Err("The value must have syntax ipv4:port".into()),
                 })
                 .help("Multicast address to found others 'termchat' applications"),
         )
@@ -39,7 +39,7 @@ fn main() {
                 .default_value("0")
                 .validator(|port| match port.parse::<u16>() {
                     Ok(_) => Ok(()),
-                    Err(_) => Err("The value must be in range 0..65535".into())
+                    Err(_) => Err("The value must be in range 0..65535".into()),
                 })
                 .help("Tcp server port used when communicating with other termchat instances"),
         )

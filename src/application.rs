@@ -45,16 +45,12 @@ impl<'a> Application<'a> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = NetworkManager::new(move |net_event| {
-            sender.send(Event::Network(net_event))
-        });
+        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
-        let _terminal_events = TerminalEventCollector::new(move |term_event| {
-            match term_event {
-                Ok(event) => sender.send(Event::Terminal(event)),
-                Err(e) => sender.send(Event::Close(Some(e))),
-            }
+        let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
+            Ok(event) => sender.send(Event::Terminal(event)),
+            Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
         Ok(Application {
@@ -87,9 +83,7 @@ impl<'a> Application<'a> {
                         self.process_network_message(endpoint, message);
                     }
                     NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) => {
-                        self.state.disconnected_user(endpoint)
-                    }
+                    NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
                 },
                 Event::Terminal(term_event) => {
                     self.process_terminal_event(term_event);
@@ -100,7 +94,7 @@ impl<'a> Application<'a> {
                 Event::Close(error) => {
                     return match error {
                         Some(error) => Err(error),
-                        None => Ok(())
+                        None => Ok(()),
                     }
                 }
             }
@@ -145,10 +139,8 @@ impl<'a> Application<'a> {
 
                     match chunk {
                         Chunk::Error => {
-                            let msg = format!(
-                                "'{}' had an error while sending '{}'",
-                                user, file_name
-                            );
+                            let msg =
+                                format!("'{}' had an error while sending '{}'", user, file_name);
                             self.state.add_system_error_message(msg);
                         }
                         Chunk::End => {
@@ -213,10 +205,12 @@ impl<'a> Application<'a> {
                                 );
                                 self.state.add_message(message);
 
-                                self.network.send_all(
-                                    self.state.all_user_endpoints(),
-                                    NetMessage::UserMessage(input.clone())
-                                ).ok(); //Best effort
+                                self.network
+                                    .send_all(
+                                        self.state.all_user_endpoints(),
+                                        NetMessage::UserMessage(input.clone()),
+                                    )
+                                    .ok(); //Best effort
 
                                 if let Some(action) = action {
                                     self.process_action(action)
