@@ -156,7 +156,7 @@ impl<'a> Application<'a> {
                                 match std::fs::create_dir_all(&user_path) {
                                     Ok(_) => (),
                                     Err(ref err) if err.kind() == ErrorKind::AlreadyExists => (),
-                                    Err(e) => Err(e)?,
+                                    Err(e) => return Err(e.into()),
                                 }
 
                                 let file_path = user_path.join(file_name);

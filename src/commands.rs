@@ -7,7 +7,7 @@ use std::collections::{HashMap};
 
 pub trait Command {
     fn name(&self) -> &'static str;
-    fn parse_params(&self, params: Vec<&str>) -> Result<Box<dyn Action>>;
+    fn parse_params(&self, params: &[&str]) -> Result<Box<dyn Action>>;
 }
 
 #[derive(Default)]
@@ -24,11 +24,12 @@ impl CommandManager {
     }
 
     pub fn find_command_action(&self, input: &str) -> Option<Result<Box<dyn Action>>> {
-        let mut input = input.split_whitespace();
-        let start = input.next().expect("Input must have some content");
-        if start.starts_with(Self::COMMAND_PREFIX) {
-            if let Some(parser) = self.parsers.get(&start[1..]) {
-                return Some(parser.parse_params(input.collect()))
+        if let Some(input) = input.strip_prefix(Self::COMMAND_PREFIX) {
+            let params = input.split_whitespace().collect::<Vec<_>>();
+            if let Some((first, rest)) = params.split_first() {
+                if let Some(parser) = self.parsers.get(first) {
+                    return Some(parser.parse_params(rest))
+                }
             }
         }
         None
