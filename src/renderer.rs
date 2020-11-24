@@ -40,7 +40,7 @@ impl Drop for Renderer {
             eprintln!(
                 "{}, example: {}",
                 "termchat paniced, to log the error you can redirect stderror to a file",
-                "`termchat 2> termchat_log`"
+                "termchat 2> termchat_log"
             );
         }
     }

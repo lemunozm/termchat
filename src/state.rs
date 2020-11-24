@@ -7,8 +7,10 @@ use std::collections::HashMap;
 
 #[derive(PartialEq)]
 pub enum SystemMessageType {
-    Error,
     Info,
+    #[allow(dead_code)]
+    Warning,
+    Error,
 }
 
 #[derive(PartialEq)]
@@ -230,17 +232,17 @@ impl State {
     }
 
     pub fn progress_message_update(&mut self, index: usize, increment: u64) {
-        match &self.messages[index].message_type {
-            MessageType::Progress(state) => {
-                match state {
-                    ProgressState::Started(total) => ProgressState::Working(increment, *total),
-                    ProgressState::Working(current, total) => {
-                        let new_current = current + increment;
+        match &mut self.messages[index].message_type {
+            MessageType::Progress(ref mut state) => {
+                *state = match state {
+                    ProgressState::Started(total) => ProgressState::Working(*total, increment),
+                    ProgressState::Working(total, current) => {
+                        let new_current = *current + increment;
                         if new_current == *total {
                             ProgressState::Completed
                         }
                         else {
-                            ProgressState::Working(new_current, *total)
+                            ProgressState::Working(*total, new_current)
                         }
                     }
                     ProgressState::Completed => ProgressState::Completed,

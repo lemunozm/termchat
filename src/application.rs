@@ -205,30 +205,27 @@ impl<'a> Application<'a> {
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
-                        let should_send = match self.commands.find_command_action(&input) {
-                            Some(Ok(action)) => {
-                                self.process_action(action);
-                                true
+                        match self.commands.find_command_action(&input).transpose() {
+                            Ok(action) => {
+                                let message = ChatMessage::new(
+                                    format!("{} (me)", self.config.user_name),
+                                    MessageType::Text(input.clone()),
+                                );
+                                self.state.add_message(message);
+
+                                self.network.send_all(
+                                    self.state.all_user_endpoints(),
+                                    NetMessage::UserMessage(input.clone())
+                                ).ok(); //Best effort
+
+                                if let Some(action) = action {
+                                    self.process_action(action)
+                                }
                             }
-                            Some(Err(e)) => {
-                                self.state.add_system_error_message(e.to_string());
-                                false
+                            Err(error) => {
+                                self.state.add_system_error_message(error.to_string());
                             }
-                            None => true,
                         };
-
-                        if should_send {
-                            self.network.send_all(
-                                self.state.all_user_endpoints(),
-                                NetMessage::UserMessage(input.clone())
-                            ).ok(); //Best effort
-
-                            let message = ChatMessage::new(
-                                format!("{} (me)", self.config.user_name),
-                                MessageType::Text(input.clone()),
-                            );
-                            self.state.add_message(message);
-                        }
                     }
                 }
                 KeyCode::Delete => {

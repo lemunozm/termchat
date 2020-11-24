@@ -1,4 +1,5 @@
 use super::state::{ProgressState, State, MessageType, SystemMessageType};
+use super::commands::{CommandManager};
 use super::util::{split_each};
 
 use tui::backend::CrosstermBackend;
@@ -66,7 +67,8 @@ fn draw_messages_panel(
                 }
                 MessageType::System(content, msg_type) => {
                     let (user_color, content_color) = match msg_type {
-                        SystemMessageType::Info => (Color::Yellow, Color::LightYellow),
+                        SystemMessageType::Info => (Color::Cyan, Color::LightCyan),
+                        SystemMessageType::Warning => (Color::Yellow, Color::LightYellow),
                         SystemMessageType::Error => (Color::Red, Color::LightRed),
                     };
                     Spans::from(vec![
@@ -95,25 +97,20 @@ fn draw_messages_panel(
 }
 
 fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
-    let (title, current, max) = match progress {
-        ProgressState::Started(_) => ("Pending: ", 0, 0),
-        ProgressState::Working(max, current) => ("Sending: ", *current, *max),
-        ProgressState::Completed => ("Done! ", 100, 100),
-    };
-
     let color = Color::LightGreen;
+    let width = (panel_width - 20) as usize;
 
-    let width = panel_width - 20;
-
-    let width = width as f64;
-    let current = current as f64;
-    let max = max as f64;
-
-    let pct = current / max;
-    let pct = if !pct.is_finite() { 0.0 } else { pct };
-
-    let ui_current = (pct * width) as usize;
-    let ui_remaining = width as usize - ui_current;
+    let (title, ui_current, ui_remaining) = match progress {
+        ProgressState::Started(_) => ("Pending: ", 0, width),
+        ProgressState::Working(total, current) => {
+            eprintln!("{}  {}", total, current);
+            let percentage = *current as f64 / *total as f64;
+            let ui_current = (percentage * width as f64) as usize;
+            let ui_remaining = width - ui_current;
+            ("Sending: ", ui_current, ui_remaining)
+        }
+        ProgressState::Completed => ("Done! ", width, 0),
+    };
 
     let current: String = std::iter::repeat("#").take(ui_current).collect();
     let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
@@ -127,27 +124,20 @@ fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
 }
 
 fn parse_content(content: &str) -> Vec<Span> {
-    let color_command = |command| {
+    if content.starts_with(CommandManager::COMMAND_PREFIX) {
+        // The content represents a command
         content
-            .splitn(2, command)
+            .split_whitespace()
             .enumerate()
             .map(|(index, part)| {
-                // ?send
                 if index == 0 {
-                    Span::styled(command, Style::default().fg(Color::LightYellow))
+                    Span::styled(part, Style::default().fg(Color::LightYellow))
                 }
                 else {
-                    Span::raw(part)
+                    Span::raw(format!(" {}", part))
                 }
             })
             .collect()
-    };
-
-    const SEND_COMMAND: &str = "?send";
-
-    if content.starts_with(SEND_COMMAND) {
-        color_command(SEND_COMMAND)
-    // other commands can be handled here the same way
     }
     else {
         vec![Span::raw(content)]

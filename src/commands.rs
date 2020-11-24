@@ -16,7 +16,7 @@ pub struct CommandManager {
 }
 
 impl CommandManager {
-    const COMMAND_PREFIX: &'static str = "?";
+    pub const COMMAND_PREFIX: &'static str = "?";
     pub fn with(mut self, command_parser: impl Command + 'static) -> Self {
         self.parsers.insert(command_parser.name(), Box::new(command_parser));
         self
@@ -27,7 +27,7 @@ impl CommandManager {
         let start = input.next().expect("Input must have some content");
         if start.starts_with(Self::COMMAND_PREFIX) {
             if let Some(parser) = self.parsers.get(&start[1..]) {
-                Some(parser.parse_params(input.collect()));
+                return Some(parser.parse_params(input.collect()))
             }
         }
         None
