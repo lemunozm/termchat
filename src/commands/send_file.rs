@@ -62,7 +62,9 @@ impl Action for SendFile {
         let mut data = [0; Self::CHUNK_SIZE];
         let (bytes_read, chunk, processing) = match self.file.read(&mut data) {
             Ok(0) => (0, Chunk::End, Processing::Completed),
-            Ok(bytes_read) => (bytes_read, Chunk::Data(data.to_vec()), Processing::Partial),
+            Ok(bytes_read) => {
+                (bytes_read, Chunk::Data(data[..bytes_read].to_vec()), Processing::Partial)
+            }
             Err(error) => {
                 let msg = format!("Error sending file. error: {}", error);
                 state.add_system_error_message(msg);
