@@ -33,7 +33,7 @@ pub struct SendFile {
 }
 
 impl SendFile {
-    const CHUNK_SIZE: usize = 65500;
+    const CHUNK_SIZE: usize = 65535;
 
     pub fn new(file_path: &str) -> Result<SendFile> {
         const READ_FILENAME_ERROR: &str = "Unable to read file name";
