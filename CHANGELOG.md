@@ -1,5 +1,8 @@
 # Changelog
 
+## Release 1.1.2
+- Fixed issue that blocks the receiver of a file while the file was sending.
+
 ## Release 1.1.1
 - Fixed minor visual printed line removed.
 - Fixed: If user write `? + <Enter>` now, not generate an error.
