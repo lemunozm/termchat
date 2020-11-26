@@ -1,7 +1,9 @@
 # Changelog
 
 ## Release 1.1.2
-- Fixed issue that blocks the receiver of a file while the file was sending.
+- Fixed an issue that blocks the receiver of a file while the file was sending.
+- Fixed an issue that appended data to the end of the file once transfered.
+- Fixed an issue that lost some data in the file transfer.
 
 ## Release 1.1.1
 - Fixed minor visual printed line removed.
