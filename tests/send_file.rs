@@ -11,8 +11,19 @@ fn send_file() {
     let data = vec![rand::random(); 10usize.pow(6)];
     std::fs::write(&test_path, &data).unwrap();
 
-    let (mut s1, t1) = test_user(1);
-    let (s2, t2) = test_user(2);
+    // spawn users
+    let config1: Config = Config {
+        discovery_addr: "238.255.0.1:5877".parse().unwrap(),
+        tcp_server_port: "0".parse().unwrap(),
+        user_name: 1.to_string(),
+    };
+    let config2: Config = Config {
+        discovery_addr: "238.255.0.1:5877".parse().unwrap(),
+        tcp_server_port: "0".parse().unwrap(),
+        user_name: 2.to_string(),
+    };
+    let (mut s1, t1) = test_user(config1);
+    let (s2, t2) = test_user(config2);
 
     // wait for users to connect
     std::thread::sleep(std::time::Duration::from_millis(100));
@@ -34,15 +45,9 @@ fn send_file() {
     assert_eq!(data, send_data);
 }
 
-fn test_user(n: usize) -> (EventSender<Event>, std::thread::JoinHandle<()>) {
+fn test_user(config: Config) -> (EventSender<Event>, std::thread::JoinHandle<()>) {
     let (tx, rx) = std::sync::mpsc::channel();
     let t = std::thread::spawn(move || {
-        let config: Config = Config {
-            discovery_addr: "238.255.0.1:5877".parse().unwrap(),
-            tcp_server_port: "0".parse().unwrap(),
-            user_name: n.to_string(),
-        };
-
         let mut app = Application::new(&config).unwrap();
         let sender = app.sender();
         tx.send(sender).unwrap();
