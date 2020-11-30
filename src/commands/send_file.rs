@@ -4,7 +4,7 @@ use crate::state::{State};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Result};
 
-use message_io::network::{NetworkManager};
+use message_io::network::{Network};
 
 use std::path::{Path};
 use std::io::{Read};
@@ -53,7 +53,7 @@ impl SendFile {
 }
 
 impl Action for SendFile {
-    fn process(&mut self, state: &mut State, network: &mut NetworkManager) -> Processing {
+    fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
         if self.progress_id.is_none() {
             let id = state.add_progress_message(&self.file_name, self.file_size);
             self.progress_id = Some(id);
@@ -75,7 +75,7 @@ impl Action for SendFile {
         state.progress_message_update(self.progress_id.unwrap(), bytes_read as u64);
 
         let message = NetMessage::UserData(self.file_name.clone(), chunk);
-        network.send_all(state.all_user_endpoints(), message).ok(); //Best effort
+        network.send_all(state.all_user_endpoints(), message);
 
         processing
     }

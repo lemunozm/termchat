@@ -39,6 +39,7 @@ impl ChatMessage {
     }
 }
 
+#[derive(Default)]
 pub struct State {
     messages: Vec<ChatMessage>,
     scroll_messages_view: usize,
@@ -63,18 +64,6 @@ pub enum ScrollMovement {
 }
 
 impl State {
-    pub fn new() -> State {
-        State {
-            messages: Vec::new(),
-            scroll_messages_view: 0,
-            input: vec![],
-            input_cursor: 0,
-            lan_users: HashMap::new(),
-            users_id: HashMap::new(),
-            last_user_id: 0,
-        }
-    }
-
     pub fn messages(&self) -> &Vec<ChatMessage> {
         &self.messages
     }

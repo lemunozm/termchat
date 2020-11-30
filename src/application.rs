@@ -10,7 +10,7 @@ use crate::commands::send_file::{SendFileCommand};
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 use message_io::events::{EventQueue};
-use message_io::network::{NetEvent, NetworkManager, Endpoint};
+use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
@@ -33,7 +33,7 @@ pub struct Config {
 pub struct Application<'a> {
     config: &'a Config,
     state: State,
-    network: NetworkManager,
+    network: Network,
     commands: CommandManager,
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
@@ -45,7 +45,7 @@ impl<'a> Application<'a> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = NetworkManager::new(move |net_event| sender.send(Event::Network(net_event)));
+        let network = Network::new(move |net_event| sender.send(Event::Network(net_event)));
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
@@ -55,7 +55,7 @@ impl<'a> Application<'a> {
 
         Ok(Application {
             config,
-            state: State::new(),
+            state: State::default(),
             network,
             commands: CommandManager::default().with(SendFileCommand),
             // Stored because we need its internal thread running until the Application was dropped
@@ -74,7 +74,7 @@ impl<'a> Application<'a> {
 
         let discovery_endpoint = self.network.connect_udp(self.config.discovery_addr)?;
         let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
-        self.network.send(discovery_endpoint, message)?;
+        self.network.send(discovery_endpoint, message);
 
         loop {
             match self.event_queue.receive() {
@@ -84,6 +84,7 @@ impl<'a> Application<'a> {
                     }
                     NetEvent::AddedEndpoint(_) => (),
                     NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
+                    NetEvent::DeserializationError(_) => ()
                 },
                 Event::Terminal(term_event) => {
                     self.process_terminal_event(term_event);
@@ -112,7 +113,7 @@ impl<'a> Application<'a> {
                     let mut try_connect = || -> Result<()> {
                         let user_endpoint = self.network.connect_tcp(server_addr)?;
                         let message = NetMessage::HelloUser(self.config.user_name.clone());
-                        self.network.send(user_endpoint, message)?;
+                        self.network.send(user_endpoint, message);
                         self.state.connected_user(user_endpoint, &user);
                         Ok(())
                     };
@@ -209,8 +210,7 @@ impl<'a> Application<'a> {
                                     .send_all(
                                         self.state.all_user_endpoints(),
                                         NetMessage::UserMessage(input.clone()),
-                                    )
-                                    .ok(); //Best effort
+                                    );
 
                                 if let Some(action) = action {
                                     self.process_action(action)
