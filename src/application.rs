@@ -15,7 +15,7 @@ use message_io::network::{NetEvent, Network, Endpoint};
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
 
-enum Event {
+pub enum Event {
     Network(NetEvent<NetMessage>),
     Terminal(TermEvent),
     Action(Box<dyn Action>),
@@ -261,5 +261,9 @@ impl<'a> Application<'a> {
                 self.event_queue.sender().send(Event::Action(action));
             }
         }
+    }
+
+    pub fn sender(&mut self) -> message_io::events::EventSender<Event> {
+        self.event_queue.sender().clone()
     }
 }

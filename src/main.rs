@@ -1,14 +1,4 @@
-mod application;
-mod state;
-mod terminal_events;
-mod message;
-mod renderer;
-mod action;
-mod commands;
-mod ui;
-mod util;
-
-use application::{Application, Config};
+use termchat::application::{Application, Config};
 
 use clap::{App, Arg};
 
