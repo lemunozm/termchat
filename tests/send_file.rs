@@ -23,6 +23,8 @@ fn send_file() {
         user_name: 2.to_string(),
     };
     let (mut s1, t1) = test_user(config1);
+    // wait a bit or termchat will creates two-communication channels at the same time
+    std::thread::sleep(std::time::Duration::from_millis(100));
     let (s2, t2) = test_user(config2);
 
     // wait for users to connect
