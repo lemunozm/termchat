@@ -4,7 +4,7 @@ use crate::renderer::{Renderer};
 use crate::action::{Action, Processing};
 use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
-use crate::util::{Error, Result};
+use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -117,9 +117,7 @@ impl<'a> Application<'a> {
                         self.state.connected_user(user_endpoint, &user);
                         Ok(())
                     };
-                    if let Err(e) = try_connect() {
-                        self.state.add_system_error_message(e.to_string());
-                    }
+                    try_connect().report_if_err(&mut self.state);
                 }
             }
             // by tcp:
@@ -140,16 +138,15 @@ impl<'a> Application<'a> {
 
                     match chunk {
                         Chunk::Error => {
-                            let msg =
-                                format!("'{}' had an error while sending '{}'", user, file_name);
-                            self.state.add_system_error_message(msg);
+                            format!("'{}' had an error while sending '{}'", user, file_name)
+                                .report_err(&mut self.state);
                         }
                         Chunk::End => {
-                            let msg = format!(
+                            format!(
                                 "Successfully received file '{}' from user '{}'!",
                                 file_name, user
-                            );
-                            self.state.add_system_info_message(msg);
+                            )
+                            .report_info(&mut self.state);
                         }
                         Chunk::Data(data) => {
                             let try_write = || -> Result<()> {
@@ -170,9 +167,7 @@ impl<'a> Application<'a> {
                                 Ok(())
                             };
 
-                            if let Err(error) = try_write() {
-                                self.state.add_system_error_message(error.to_string());
-                            }
+                            try_write().report_if_err(&mut self.state);
                         }
                     }
                 }
@@ -217,7 +212,7 @@ impl<'a> Application<'a> {
                                 }
                             }
                             Err(error) => {
-                                self.state.add_system_error_message(error.to_string());
+                                error.report_err(&mut self.state);
                             }
                         };
                     }
