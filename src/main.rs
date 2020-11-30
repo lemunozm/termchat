@@ -50,7 +50,7 @@ fn main() {
     };
 
     let result = match Application::new(&config) {
-        Ok(mut app) => app.run(),
+        Ok(mut app) => app.run(std::io::stdout()),
         Err(e) => Err(e),
     };
 

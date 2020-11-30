@@ -64,8 +64,8 @@ impl<'a> Application<'a> {
         })
     }
 
-    pub fn run(&mut self) -> Result<()> {
-        let mut renderer = Renderer::new()?;
+    pub fn run(&mut self, out: impl std::io::Write) -> Result<()> {
+        let mut renderer = Renderer::new(out)?;
         renderer.render(&self.state)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);

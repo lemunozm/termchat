@@ -46,7 +46,7 @@ fn test_user(n: usize) -> (EventSender<Event>, std::thread::JoinHandle<()>) {
         let mut app = Application::new(&config).unwrap();
         let sender = app.sender();
         tx.send(sender).unwrap();
-        app.run().unwrap();
+        app.run(std::io::sink()).unwrap();
     });
     (rx.recv().unwrap(), t)
 }
