@@ -90,6 +90,6 @@ impl Reportable for String {
     }
 
     fn report_warn(self, state: &mut State) {
-        state.add_system_info_message(self);
+        state.add_system_warn_message(self);
     }
 }
