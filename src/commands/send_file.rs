@@ -2,7 +2,7 @@ use crate::action::{Action, Processing};
 use crate::commands::{Command};
 use crate::state::{State};
 use crate::message::{NetMessage, Chunk};
-use crate::util::{Result};
+use crate::util::{Result, Reportable};
 
 use message_io::network::{Network};
 
@@ -66,8 +66,7 @@ impl Action for SendFile {
                 (bytes_read, Chunk::Data(data[..bytes_read].to_vec()), Processing::Partial)
             }
             Err(error) => {
-                let msg = format!("Error sending file. error: {}", error);
-                state.add_system_error_message(msg);
+                format!("Error sending file. error: {}", error).report_err(state);
                 (0, Chunk::Error, Processing::Completed)
             }
         };

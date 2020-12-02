@@ -7,7 +7,6 @@ use std::collections::HashMap;
 #[derive(PartialEq)]
 pub enum SystemMessageType {
     Info,
-    #[allow(dead_code)]
     Warning,
     Error,
 }
@@ -195,6 +194,12 @@ impl State {
     }
 
     pub fn add_message(&mut self, message: ChatMessage) {
+        self.messages.push(message);
+    }
+
+    pub fn add_system_warn_message(&mut self, content: String) {
+        let message_type = MessageType::System(content, SystemMessageType::Warning);
+        let message = ChatMessage::new("Termchat: ".into(), message_type);
         self.messages.push(message);
     }
 
