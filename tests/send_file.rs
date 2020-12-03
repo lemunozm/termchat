@@ -1,3 +1,5 @@
+#![cfg(feature = "ui-test")]
+
 use termchat::application::{Application, Event, Config};
 use message_io::events::EventSender;
 

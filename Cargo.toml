@@ -26,3 +26,6 @@ unicode-width = "0.1.8"
 
 [dev-dependencies]
 rand = "0.7.3"
+
+[features]
+ui-test = []
