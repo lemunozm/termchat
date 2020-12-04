@@ -12,13 +12,13 @@ pub trait Command {
 
 #[derive(Default)]
 pub struct CommandManager {
-    parsers: HashMap<&'static str, Box<dyn Command>>,
+    parsers: HashMap<&'static str, Box<dyn Command + Send>>,
 }
 
 impl CommandManager {
     pub const COMMAND_PREFIX: &'static str = "?";
 
-    pub fn with(mut self, command_parser: impl Command + 'static) -> Self {
+    pub fn with(mut self, command_parser: impl Command + 'static + Send) -> Self {
         self.parsers.insert(command_parser.name(), Box::new(command_parser));
         self
     }

@@ -1,14 +1,4 @@
-mod application;
-mod state;
-mod terminal_events;
-mod message;
-mod renderer;
-mod action;
-mod commands;
-mod ui;
-mod util;
-
-use application::{Application, Config};
+use termchat::application::{Application, Config};
 
 use clap::{App, Arg};
 
@@ -60,7 +50,7 @@ fn main() {
     };
 
     let result = match Application::new(&config) {
-        Ok(mut app) => app.run(),
+        Ok(mut app) => app.run(std::io::stdout()),
         Err(e) => Err(e),
     };
 
