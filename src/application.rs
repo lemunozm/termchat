@@ -46,7 +46,6 @@ pub struct Application<'a> {
 
 struct Vr {
     w: Option<Window>,
-    b: Vec<u32>,
 }
 
 impl<'a> Application<'a> {
@@ -70,7 +69,7 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
-            vr: Vr { b: vec![0; 640 * 480], w: None },
+            vr: Vr { w: None },
         })
     }
 
@@ -183,38 +182,22 @@ impl<'a> Application<'a> {
                 }
             }
             NetMessage::S(data) => {
-                if data.is_none() {
-                    // stream has stopped
-                    // drop the window
-                    self.vr.w = None;
-                // this doesnt close the winow unforonantly
-                }
-                else {
-                    let data = data.unwrap();
+                if let Some((data, width, height)) = data {
                     if self.vr.w.is_none() {
-                        let mut window = Window::new("Stream", 640, 480, WindowOptions::default())
-                            .unwrap_or_else(|e| {
-                                panic!("{}", e);
-                            });
-
-                        for (idx, i) in data.into_iter().enumerate() {
-                            self.vr.b[idx] = i;
-                        }
-
-                        window.update_with_buffer(&self.vr.b, 640, 480).unwrap();
+                        let window =
+                            Window::new("Stream", width, height, WindowOptions::default()).unwrap();
                         self.vr.w = Some(window);
                     }
-                    else {
-                        for (idx, i) in data.into_iter().enumerate() {
-                            self.vr.b[idx] = i;
-                        }
-                        self.vr
-                            .w
-                            .as_mut()
-                            .unwrap()
-                            .update_with_buffer(&self.vr.b, 640, 360)
-                            .unwrap();
-                    }
+                    assert_eq!(width / 2 * height, data.len());
+                    self.vr
+                        .w
+                        .as_mut()
+                        .unwrap()
+                        .update_with_buffer(&data, width / 2, height)
+                        .unwrap();
+                }
+                else {
+                    self.vr.w = None;
                 }
             }
         }

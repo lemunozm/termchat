@@ -93,3 +93,19 @@ impl Reportable for String {
         state.add_system_warn_message(self);
     }
 }
+
+#[allow(non_snake_case)]
+pub fn yuyv_to_rgb(v: &[u8]) -> [u8; 4] {
+    // convert form YUYV to RGB
+    let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
+    let Y = Y as f32;
+    let U = U as f32;
+    let V = V as f32;
+
+    let B = 1.164 * (Y - 16.) + 2.018 * (U - 128.);
+
+    let G = 1.164 * (Y - 16.) - 0.813 * (V - 128.) - 0.391 * (U - 128.);
+
+    let R = 1.164 * (Y - 16.) + 1.596 * (V - 128.);
+    [0, R as u8, G as u8, B as u8]
+}

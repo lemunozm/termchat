@@ -13,5 +13,5 @@ pub enum NetMessage {
     HelloUser(String),       // user_name
     UserMessage(String),     // content
     UserData(String, Chunk), // file_name, chunk
-    S(Option<Vec<u32>>),
+    S(Option<(Vec<u32>, usize, usize)>),
 }
