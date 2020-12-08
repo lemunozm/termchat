@@ -1,4 +1,5 @@
 pub mod send_file;
+pub mod ss;
 
 use crate::action::{Action};
 use crate::util::{Result};
@@ -28,7 +29,7 @@ impl CommandManager {
             let params = input.split_whitespace().collect::<Vec<_>>();
             if let Some((first, rest)) = params.split_first() {
                 if let Some(parser) = self.parsers.get(first) {
-                    return Some(parser.parse_params(rest))
+                    return Some(parser.parse_params(rest));
                 }
             }
         }

@@ -13,4 +13,5 @@ pub enum NetMessage {
     HelloUser(String),       // user_name
     UserMessage(String),     // content
     UserData(String, Chunk), // file_name, chunk
+    S(Vec<u8>),
 }

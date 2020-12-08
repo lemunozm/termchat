@@ -6,6 +6,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
+use crate::commands::ss::{SsCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
@@ -57,7 +58,7 @@ impl<'a> Application<'a> {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default().with(SendFileCommand),
+            commands: CommandManager::default().with(SendFileCommand).with(SsCommand),
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -84,7 +85,7 @@ impl<'a> Application<'a> {
                     }
                     NetEvent::AddedEndpoint(_) => (),
                     NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
-                    NetEvent::DeserializationError(_) => ()
+                    NetEvent::DeserializationError(_) => (),
                 },
                 Event::Terminal(term_event) => {
                     self.process_terminal_event(term_event);
@@ -172,6 +173,9 @@ impl<'a> Application<'a> {
                     }
                 }
             }
+            NetMessage::S(data) => {
+                dbg!(&data);
+            }
         }
     }
 
@@ -186,8 +190,7 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    }
-                    else {
+                    } else {
                         self.state.input_write(character);
                     }
                 }
@@ -201,11 +204,10 @@ impl<'a> Application<'a> {
                                 );
                                 self.state.add_message(message);
 
-                                self.network
-                                    .send_all(
-                                        self.state.all_user_endpoints(),
-                                        NetMessage::UserMessage(input.clone()),
-                                    );
+                                self.network.send_all(
+                                    self.state.all_user_endpoints(),
+                                    NetMessage::UserMessage(input.clone()),
+                                );
 
                                 if let Some(action) = action {
                                     self.process_action(action)
