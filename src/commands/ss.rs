@@ -41,9 +41,37 @@ impl Ss {
     }
 }
 
+use byteorder::ByteOrder;
 impl Action for Ss {
     fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
-        let message = NetMessage::S(self.stream.next().unwrap().data().to_vec());
+        if state.x == crate::state::Xstate::Idle {
+            return Processing::Completed;
+        }
+        #[allow(non_snake_case)]
+        let data = self
+            .stream
+            .next()
+            .unwrap()
+            .data()
+            .chunks(4)
+            .map(|v| {
+                // convert form YUYV to RGB
+                let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
+                let Y = Y as f32;
+                let U = U as f32;
+                let V = V as f32;
+
+                let B = 1.164 * (Y - 16.) + 2.018 * (U - 128.);
+
+                let G = 1.164 * (Y - 16.) - 0.813 * (V - 128.) - 0.391 * (U - 128.);
+
+                let R = 1.164 * (Y - 16.) + 1.596 * (V - 128.);
+                let v = [0, R as u8, G as u8, B as u8];
+                byteorder::BigEndian::read_u32(&v)
+            })
+            .collect();
+
+        let message = NetMessage::S(Some(data));
         network.send_all(state.all_user_endpoints(), message);
         Processing::Partial
     }

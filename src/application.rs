@@ -15,6 +15,8 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
+use minifb::Window;
+use minifb::WindowOptions;
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -39,6 +41,12 @@ pub struct Application<'a> {
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
+    vr: Vr,
+}
+
+struct Vr {
+    w: Option<Window>,
+    b: Vec<u32>,
 }
 
 impl<'a> Application<'a> {
@@ -62,6 +70,7 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
+            vr: Vr { b: vec![0; 640 * 480], w: None },
         })
     }
 
@@ -174,7 +183,39 @@ impl<'a> Application<'a> {
                 }
             }
             NetMessage::S(data) => {
-                dbg!(&data);
+                if data.is_none() {
+                    // stream has stopped
+                    // drop the window
+                    self.vr.w = None;
+                // this doesnt close the winow unforonantly
+                }
+                else {
+                    let data = data.unwrap();
+                    if self.vr.w.is_none() {
+                        let mut window = Window::new("Stream", 640, 480, WindowOptions::default())
+                            .unwrap_or_else(|e| {
+                                panic!("{}", e);
+                            });
+
+                        for (idx, i) in data.into_iter().enumerate() {
+                            self.vr.b[idx] = i;
+                        }
+
+                        window.update_with_buffer(&self.vr.b, 640, 480).unwrap();
+                        self.vr.w = Some(window);
+                    }
+                    else {
+                        for (idx, i) in data.into_iter().enumerate() {
+                            self.vr.b[idx] = i;
+                        }
+                        self.vr
+                            .w
+                            .as_mut()
+                            .unwrap()
+                            .update_with_buffer(&self.vr.b, 640, 360)
+                            .unwrap();
+                    }
+                }
             }
         }
     }
@@ -190,12 +231,19 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    } else {
+                    }
+                    else {
                         self.state.input_write(character);
                     }
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
+                        if input == "?ss" {
+                            self.state.x = crate::state::Xstate::Streaming;
+                        }
+                        if input == "?stops" {
+                            self.state.x = crate::state::Xstate::Idle;
+                        }
                         match self.commands.find_command_action(&input).transpose() {
                             Ok(action) => {
                                 let message = ChatMessage::new(

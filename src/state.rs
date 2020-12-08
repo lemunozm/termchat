@@ -47,6 +47,18 @@ pub struct State {
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
     last_user_id: usize,
+    pub x: Xstate,
+}
+
+#[derive(PartialEq)]
+pub enum Xstate {
+    Streaming,
+    Idle,
+}
+impl Default for Xstate {
+    fn default() -> Self {
+        Self::Idle
+    }
 }
 
 pub enum CursorMovement {
