@@ -1,5 +1,5 @@
 pub mod send_file;
-pub mod ss;
+pub mod send_stream;
 
 use crate::action::{Action};
 use crate::util::{Result};

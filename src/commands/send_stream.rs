@@ -6,22 +6,22 @@ use crate::util::{Result};
 
 use message_io::network::{Network};
 
-pub struct SsCommand;
+pub struct SendStreamCommand;
 
-impl Command for SsCommand {
+impl Command for SendStreamCommand {
     fn name(&self) -> &'static str {
-        "ss"
+        "stream"
     }
 
     fn parse_params(&self, _params: &[&str]) -> Result<Box<dyn Action>> {
-        match Ss::new() {
+        match SendStream::new() {
             Ok(action) => Ok(Box::new(action)),
             Err(e) => Err(e),
         }
     }
 }
 
-pub struct Ss {
+pub struct SendStream {
     stream: v4l::prelude::MmapStream<'static>,
     width: usize,
     height: usize,
@@ -29,8 +29,8 @@ pub struct Ss {
 
 use v4l::prelude::*;
 use v4l::FourCC;
-impl Ss {
-    pub fn new() -> Result<Ss> {
+impl SendStream {
+    pub fn new() -> Result<SendStream> {
         let mut dev = CaptureDevice::new(0).expect("Failed to open device");
 
         let mut fmt = dev.format().expect("Failed to read format");
@@ -41,15 +41,15 @@ impl Ss {
 
         let stream = MmapStream::with_buffers(&mut dev, 4).expect("Failed to create buffer stream");
 
-        Ok(Ss { stream, width, height })
+        Ok(SendStream { stream, width, height })
     }
 }
 
 use byteorder::ByteOrder;
-impl Action for Ss {
+impl Action for SendStream {
     fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Idle {
-            network.send_all(state.all_user_endpoints(), NetMessage::S(None));
+            network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed;
         }
         let data = self
@@ -64,7 +64,7 @@ impl Action for Ss {
             })
             .collect();
 
-        let message = NetMessage::S(Some((data, self.width, self.height)));
+        let message = NetMessage::Stream(Some((data, self.width, self.height)));
         network.send_all(state.all_user_endpoints(), message);
         Processing::Partial
     }

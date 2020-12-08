@@ -6,7 +6,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
-use crate::commands::ss::{SsCommand};
+use crate::commands::send_stream::{SendStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
@@ -66,7 +66,7 @@ impl<'a> Application<'a> {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default().with(SendFileCommand).with(SsCommand),
+            commands: CommandManager::default().with(SendFileCommand).with(SendStreamCommand),
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -182,7 +182,7 @@ impl<'a> Application<'a> {
                     }
                 }
             }
-            NetMessage::S(data) => {
+            NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
                     if !self.vr.w.contains_key(&endpoint) {
                         let window =
@@ -220,10 +220,10 @@ impl<'a> Application<'a> {
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
-                        if input == "?ss" {
+                        if input == "?stream" {
                             self.state.x = crate::state::Xstate::Streaming;
                         }
-                        if input == "?stops" {
+                        if input == "?stopstream" {
                             self.state.x = crate::state::Xstate::Idle;
                         }
                         match self.commands.find_command_action(&input).transpose() {
