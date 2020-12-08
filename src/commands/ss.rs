@@ -49,7 +49,7 @@ use byteorder::ByteOrder;
 impl Action for Ss {
     fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Idle {
-            return Processing::Completed
+            return Processing::Completed;
         }
         let data = self
             .stream

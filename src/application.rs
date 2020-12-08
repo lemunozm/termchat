@@ -15,6 +15,7 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
+use std::collections::HashMap;
 use minifb::Window;
 use minifb::WindowOptions;
 
@@ -45,7 +46,7 @@ pub struct Application<'a> {
 }
 
 struct Vr {
-    w: Option<Window>,
+    w: HashMap<Endpoint, Window>,
 }
 
 impl<'a> Application<'a> {
@@ -69,7 +70,7 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
-            vr: Vr { w: None },
+            vr: Vr { w: HashMap::new() },
         })
     }
 
@@ -183,21 +184,20 @@ impl<'a> Application<'a> {
             }
             NetMessage::S(data) => {
                 if let Some((data, width, height)) = data {
-                    if self.vr.w.is_none() {
+                    if !self.vr.w.contains_key(&endpoint) {
                         let window =
                             Window::new("Stream", width, height, WindowOptions::default()).unwrap();
-                        self.vr.w = Some(window);
+                        self.vr.w.insert(endpoint, window);
                     }
                     assert_eq!(width / 2 * height, data.len());
                     self.vr
                         .w
-                        .as_mut()
+                        .get_mut(&endpoint)
                         .unwrap()
                         .update_with_buffer(&data, width / 2, height)
                         .unwrap();
-                }
-                else {
-                    self.vr.w = None;
+                } else {
+                    self.vr.w.remove(&endpoint);
                 }
             }
         }
@@ -214,8 +214,7 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    }
-                    else {
+                    } else {
                         self.state.input_write(character);
                     }
                 }
