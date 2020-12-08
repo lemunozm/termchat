@@ -2,7 +2,7 @@ use crate::action::{Action, Processing};
 use crate::commands::{Command};
 use crate::state::{State};
 use crate::message::{NetMessage};
-use crate::util::{Result};
+use crate::util::{Result, Reportable};
 
 use message_io::network::{Network};
 
@@ -47,19 +47,25 @@ impl SendStream {
 
 use byteorder::ByteOrder;
 impl Action for SendStream {
-    fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
+    fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Idle {
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed;
         }
-        let data = self
-            .stream
-            .next()
-            .unwrap()
+        let data = match self.stream.next() {
+            Ok(d) => d,
+            Err(e) => {
+                e.to_string().report_err(&mut state);
+                network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
+                return Processing::Completed;
+            }
+        };
+        let data = data
             .data()
             .chunks(4)
             .map(|v| {
-                let v = crate::util::yuyv_to_rgb(v);
+                //safe unwrap due to chunks 4 making sure its a [u8;4]
+                let v = crate::util::yuyv_to_rgb(std::convert::TryFrom::try_from(v).unwrap());
                 byteorder::BigEndian::read_u32(&v)
             })
             .collect();

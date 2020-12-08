@@ -74,6 +74,14 @@ impl Reportable for std::result::Result<(), Vec<(message_io::network::Endpoint, 
     }
 }
 
+impl Reportable for std::result::Result<(), minifb::Error> {
+    fn report_if_err(self, state: &mut State) {
+        if let Err(e) = self {
+            e.to_string().report_err(state)
+        }
+    }
+}
+
 impl Reportable for Box<dyn std::error::Error + Send + Sync> {
     fn report_err(self, state: &mut State) {
         self.to_string().report_err(state);
@@ -95,9 +103,9 @@ impl Reportable for String {
 }
 
 #[allow(non_snake_case)]
-pub fn yuyv_to_rgb(v: &[u8]) -> [u8; 4] {
+pub fn yuyv_to_rgb(v: [u8; 4]) -> [u8; 4] {
     // convert form YUYV to RGB
-    let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
+    let [Y, U, _, V]: [u8; 4] = v;
     let Y = Y as f32;
     let U = U as f32;
     let V = V as f32;

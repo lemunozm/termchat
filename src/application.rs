@@ -42,11 +42,7 @@ pub struct Application<'a> {
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
-    vr: Vr,
-}
-
-struct Vr {
-    w: HashMap<Endpoint, Window>,
+    windows: HashMap<Endpoint, Window>,
 }
 
 impl<'a> Application<'a> {
@@ -70,7 +66,7 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
-            vr: Vr { w: HashMap::new() },
+            windows: HashMap::new(),
         })
     }
 
@@ -184,20 +180,26 @@ impl<'a> Application<'a> {
             }
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
-                    if !self.vr.w.contains_key(&endpoint) {
-                        let window =
-                            Window::new("Stream", width, height, WindowOptions::default()).unwrap();
-                        self.vr.w.insert(endpoint, window);
+                    if !self.windows.contains_key(&endpoint) {
+                        match Window::new("Stream", width, height, WindowOptions::default()) {
+                            Ok(w) => {
+                                self.windows.insert(endpoint, w);
+                            }
+                            Err(e) => {
+                                e.to_string().report_err(&mut self.state);
+                            }
+                        }
                     }
                     assert_eq!(width / 2 * height, data.len());
-                    self.vr
-                        .w
-                        .get_mut(&endpoint)
-                        .unwrap()
-                        .update_with_buffer(&data, width / 2, height)
-                        .unwrap();
+                    if let Some(window) = self.windows.get_mut(&endpoint) {
+                        window
+                            .update_with_buffer(&data, width / 2, height)
+                            .report_if_err(&mut self.state);
+                    }
                 } else {
-                    self.vr.w.remove(&endpoint);
+                    if self.windows.contains_key(&endpoint) {
+                        self.windows.remove(&endpoint);
+                    }
                 }
             }
         }
