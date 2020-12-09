@@ -45,7 +45,6 @@ impl SendStream {
     }
 }
 
-use byteorder::ByteOrder;
 impl Action for SendStream {
     fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Idle {
@@ -66,7 +65,7 @@ impl Action for SendStream {
             .map(|v| {
                 //safe unwrap due to chunks 4 making sure its a [u8;4]
                 let v = crate::util::yuyv_to_rgb(std::convert::TryFrom::try_from(v).unwrap());
-                byteorder::BigEndian::read_u32(&v)
+                u32::from_be_bytes(v)
             })
             .collect();
 

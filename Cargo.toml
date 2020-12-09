@@ -25,7 +25,6 @@ clap = "2.33.3"
 unicode-width = "0.1.8"
 v4l = "0.10.2"
 minifb = "0.19.1"
-byteorder = "1.3.4"
 
 [dev-dependencies]
 rand = "0.7.3"
