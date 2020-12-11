@@ -66,14 +66,14 @@ impl Action for SendStream {
     fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Stop {
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-            return Processing::Completed;
+            return Processing::Completed
         }
         let data = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
                 network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-                return Processing::Completed;
+                return Processing::Completed
             }
         };
         let data = data

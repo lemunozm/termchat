@@ -104,7 +104,7 @@ impl<'a> Application<'a> {
                     return match error {
                         Some(error) => Err(error),
                         None => Ok(()),
-                    };
+                    }
                 }
             }
             renderer.render(&self.state)?;
@@ -198,7 +198,8 @@ impl<'a> Application<'a> {
                             .update_with_buffer(&data, width / 2, height)
                             .report_if_err(&mut self.state);
                     }
-                } else {
+                }
+                else {
                     if self.state.windows.contains_key(&endpoint) {
                         self.state.windows.remove(&endpoint);
                     }
@@ -218,7 +219,8 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    } else {
+                    }
+                    else {
                         self.state.input_write(character);
                     }
                 }

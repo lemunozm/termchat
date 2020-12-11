@@ -201,7 +201,7 @@ impl State {
     pub fn reset_input(&mut self) -> Option<String> {
         if !self.input.is_empty() {
             self.input_cursor = 0;
-            return Some(self.input.drain(..).collect());
+            return Some(self.input.drain(..).collect())
         }
         None
     }
@@ -246,7 +246,8 @@ impl State {
                         let new_current = *current + increment;
                         if new_current == *total {
                             ProgressState::Completed
-                        } else {
+                        }
+                        else {
                             ProgressState::Working(*total, new_current)
                         }
                     }
