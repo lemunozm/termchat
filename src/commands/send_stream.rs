@@ -65,6 +65,7 @@ impl SendStream {
 impl Action for SendStream {
     fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
         if state.x == crate::state::Xstate::Stop {
+            state.x = crate::state::Xstate::Run;
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed
         }
