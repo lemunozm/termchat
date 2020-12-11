@@ -7,6 +7,7 @@ use crate::util::{Result, Reportable};
 use message_io::network::{Network};
 
 pub struct SendStreamCommand;
+pub struct StopStreamCommand;
 
 impl Command for SendStreamCommand {
     fn name(&self) -> &'static str {
@@ -18,6 +19,22 @@ impl Command for SendStreamCommand {
             Ok(action) => Ok(Box::new(action)),
             Err(e) => Err(e),
         }
+    }
+}
+impl Command for StopStreamCommand {
+    fn name(&self) -> &'static str {
+        "stopstream"
+    }
+
+    fn parse_params(&self, _params: &[&str]) -> Result<Box<dyn Action>> {
+        Ok(Box::new(StopStream {}))
+    }
+}
+struct StopStream {}
+impl Action for StopStream {
+    fn process(&mut self, state: &mut State, _network: &mut Network) -> Processing {
+        state.x = crate::state::Xstate::Stop;
+        Processing::Completed
     }
 }
 
@@ -47,7 +64,7 @@ impl SendStream {
 
 impl Action for SendStream {
     fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
-        if state.x == crate::state::Xstate::Idle {
+        if state.x == crate::state::Xstate::Stop {
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed;
         }

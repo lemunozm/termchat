@@ -6,7 +6,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
-use crate::commands::send_stream::{SendStreamCommand};
+use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
@@ -15,9 +15,7 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
-use std::collections::HashMap;
-use minifb::Window;
-use minifb::WindowOptions;
+use minifb::{Window, WindowOptions};
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -42,7 +40,6 @@ pub struct Application<'a> {
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
-    windows: HashMap<Endpoint, Window>,
 }
 
 impl<'a> Application<'a> {
@@ -62,11 +59,13 @@ impl<'a> Application<'a> {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default().with(SendFileCommand).with(SendStreamCommand),
+            commands: CommandManager::default()
+                .with(SendFileCommand)
+                .with(SendStreamCommand)
+                .with(StopStreamCommand),
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
-            windows: HashMap::new(),
         })
     }
 
@@ -99,10 +98,13 @@ impl<'a> Application<'a> {
                     self.process_action(action);
                 }
                 Event::Close(error) => {
+                    // Make sure to send a message to peers to close any active stream
+                    self.network
+                        .send_all(self.state.all_user_endpoints(), NetMessage::Stream(None));
                     return match error {
                         Some(error) => Err(error),
                         None => Ok(()),
-                    }
+                    };
                 }
             }
             renderer.render(&self.state)?;
@@ -180,10 +182,10 @@ impl<'a> Application<'a> {
             }
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
-                    if !self.windows.contains_key(&endpoint) {
+                    if !self.state.windows.contains_key(&endpoint) {
                         match Window::new("Stream", width, height, WindowOptions::default()) {
                             Ok(w) => {
-                                self.windows.insert(endpoint, w);
+                                self.state.windows.insert(endpoint, w);
                             }
                             Err(e) => {
                                 e.to_string().report_err(&mut self.state);
@@ -191,14 +193,14 @@ impl<'a> Application<'a> {
                         }
                     }
                     assert_eq!(width / 2 * height, data.len());
-                    if let Some(window) = self.windows.get_mut(&endpoint) {
+                    if let Some(window) = self.state.windows.get_mut(&endpoint) {
                         window
                             .update_with_buffer(&data, width / 2, height)
                             .report_if_err(&mut self.state);
                     }
                 } else {
-                    if self.windows.contains_key(&endpoint) {
-                        self.windows.remove(&endpoint);
+                    if self.state.windows.contains_key(&endpoint) {
+                        self.state.windows.remove(&endpoint);
                     }
                 }
             }
@@ -222,12 +224,6 @@ impl<'a> Application<'a> {
                 }
                 KeyCode::Enter => {
                     if let Some(input) = self.state.reset_input() {
-                        if input == "?stream" {
-                            self.state.x = crate::state::Xstate::Streaming;
-                        }
-                        if input == "?stopstream" {
-                            self.state.x = crate::state::Xstate::Idle;
-                        }
                         match self.commands.find_command_action(&input).transpose() {
                             Ok(action) => {
                                 let message = ChatMessage::new(

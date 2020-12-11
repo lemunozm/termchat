@@ -1,5 +1,5 @@
 use message_io::network::Endpoint;
-
+use minifb::Window;
 use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
@@ -48,16 +48,17 @@ pub struct State {
     users_id: HashMap<String, usize>,
     last_user_id: usize,
     pub x: Xstate,
+    pub windows: HashMap<Endpoint, Window>,
 }
 
 #[derive(PartialEq)]
 pub enum Xstate {
-    Streaming,
-    Idle,
+    Run,
+    Stop,
 }
 impl Default for Xstate {
     fn default() -> Self {
-        Self::Idle
+        Self::Run
     }
 }
 
@@ -200,7 +201,7 @@ impl State {
     pub fn reset_input(&mut self) -> Option<String> {
         if !self.input.is_empty() {
             self.input_cursor = 0;
-            return Some(self.input.drain(..).collect())
+            return Some(self.input.drain(..).collect());
         }
         None
     }
@@ -245,8 +246,7 @@ impl State {
                         let new_current = *current + increment;
                         if new_current == *total {
                             ProgressState::Completed
-                        }
-                        else {
+                        } else {
                             ProgressState::Working(*total, new_current)
                         }
                     }
