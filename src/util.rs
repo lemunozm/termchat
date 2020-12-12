@@ -102,6 +102,7 @@ impl Reportable for String {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[allow(non_snake_case)]
 pub fn yuyv_to_rgb(v: [u8; 4]) -> [u8; 4] {
     // convert form YUYV to RGB

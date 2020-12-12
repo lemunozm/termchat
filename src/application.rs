@@ -6,6 +6,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
+#[cfg(target_os = "linux")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -54,15 +55,19 @@ impl<'a> Application<'a> {
             Ok(event) => sender.send(Event::Terminal(event)),
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
+        #[allow(unused_mut)]
+        let mut commands = CommandManager::default().with(SendFileCommand);
+
+        #[cfg(target_os = "linux")]
+        {
+            commands = commands.with(SendStreamCommand).with(StopStreamCommand);
+        }
 
         Ok(Application {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default()
-                .with(SendFileCommand)
-                .with(SendStreamCommand)
-                .with(StopStreamCommand),
+            commands,
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -88,7 +93,11 @@ impl<'a> Application<'a> {
                         self.process_network_message(endpoint, message);
                     }
                     NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
+                    NetEvent::RemovedEndpoint(endpoint) => {
+                        self.state.disconnected_user(endpoint);
+                        //If the endpoint was sending a stream make sure to close its window
+                        self.state.windows.remove(&endpoint);
+                    }
                     NetEvent::DeserializationError(_) => (),
                 },
                 Event::Terminal(term_event) => {
@@ -98,9 +107,6 @@ impl<'a> Application<'a> {
                     self.process_action(action);
                 }
                 Event::Close(error) => {
-                    // Make sure to send a message to peers to close any active stream
-                    self.network
-                        .send_all(self.state.all_user_endpoints(), NetMessage::Stream(None));
                     return match error {
                         Some(error) => Err(error),
                         None => Ok(()),
@@ -183,6 +189,7 @@ impl<'a> Application<'a> {
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
                     if !self.state.windows.contains_key(&endpoint) {
+                        //This is a new stream so create the window and save it to state.windows
                         match Window::new("Stream", width, height, WindowOptions::default()) {
                             Ok(w) => {
                                 self.state.windows.insert(endpoint, w);
@@ -192,17 +199,15 @@ impl<'a> Application<'a> {
                             }
                         }
                     }
-                    assert_eq!(width / 2 * height, data.len());
                     if let Some(window) = self.state.windows.get_mut(&endpoint) {
                         window
                             .update_with_buffer(&data, width / 2, height)
                             .report_if_err(&mut self.state);
                     }
                 }
-                else {
-                    if self.state.windows.contains_key(&endpoint) {
-                        self.state.windows.remove(&endpoint);
-                    }
+                else if self.state.windows.contains_key(&endpoint) {
+                    // Stream has finished clean up the window if we had it
+                    self.state.windows.remove(&endpoint);
                 }
             }
         }

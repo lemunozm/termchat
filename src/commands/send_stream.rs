@@ -50,13 +50,13 @@ impl SendStream {
     pub fn new() -> Result<SendStream> {
         let mut dev = CaptureDevice::new(0).expect("Failed to open device");
 
-        let mut fmt = dev.format().expect("Failed to read format");
+        let mut fmt = dev.format()?;
         fmt.fourcc = FourCC::new(b"YUYV");
         let width = fmt.width as usize;
         let height = fmt.height as usize;
-        dev.set_format(&fmt).expect("Failed to write format");
+        dev.set_format(&fmt)?;
 
-        let stream = MmapStream::with_buffers(&mut dev, 4).expect("Failed to create buffer stream");
+        let stream = MmapStream::with_buffers(&dev, 4)?;
 
         Ok(SendStream { stream, width, height })
     }
