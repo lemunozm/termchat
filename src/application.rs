@@ -48,7 +48,10 @@ impl<'a> Application<'a> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = Network::new(move |net_event| sender.send(Event::Network(net_event)));
+        let network = Network::new(move |net_event| match net_event {
+            NetEvent::RemovedEndpoint(_) => sender.send_with_priority(Event::Network(net_event)),
+            _ => sender.send(Event::Network(net_event)),
+        });
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
@@ -205,7 +208,7 @@ impl<'a> Application<'a> {
                             .report_if_err(&mut self.state);
                     }
                 }
-                else if self.state.windows.contains_key(&endpoint) {
+                else {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
                 }
