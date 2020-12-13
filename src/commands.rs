@@ -1,4 +1,6 @@
 pub mod send_file;
+#[cfg(target_os = "linux")]
+pub mod send_stream;
 
 use crate::action::{Action};
 use crate::util::{Result};
