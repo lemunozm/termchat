@@ -18,9 +18,14 @@ Built on top of [tui-rs](https://github.com/fdehau/tui-rs) to create the termina
 
 # Installation
 You can use the [cargo][cargo] package manager in order to install it.
+
 ```
 $ cargo install termchat
 ```
+On linux `libxkbcommon` is required (in order to stream videos).
+
+You can install it using your distribution package manager, example on ubuntu: `sudo apt-get install libxkbcommon-dev`
+
 If you have `~/.cargo/bin` in your PATH (or similar in your OS), you will be able to use *termchat* everywhere in your computer!
 
 Also, you can download the last release for your machine from the [releases](https://github.com/lemunozm/termchat/releases).
