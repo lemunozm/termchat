@@ -73,6 +73,8 @@ Termchat treats messages containings the following commands in a special way:
   example: `?send ./myfile`
 
   Note: The received files can be found in `/tmp/termchat/<termchat-username>/<file_name>`
+  
+- **`?startstream`**/**`?stopstream`**: starts/stops video stream and send it to all peers. Currently this is only supported on linux, the other platforms can only receive the video.
 
 ## Frequently Asked Questions
 
