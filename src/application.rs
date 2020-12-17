@@ -6,6 +6,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
+use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
@@ -14,6 +15,7 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
+use minifb::{Window, WindowOptions};
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -45,7 +47,10 @@ impl<'a> Application<'a> {
         let mut event_queue = EventQueue::new();
 
         let sender = event_queue.sender().clone(); // Collect network events
-        let network = Network::new(move |net_event| sender.send(Event::Network(net_event)));
+        let network = Network::new(move |net_event| match net_event {
+            NetEvent::RemovedEndpoint(_) => sender.send_with_priority(Event::Network(net_event)),
+            _ => sender.send(Event::Network(net_event)),
+        });
 
         let sender = event_queue.sender().clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
@@ -57,7 +62,10 @@ impl<'a> Application<'a> {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default().with(SendFileCommand),
+            commands: CommandManager::default()
+                .with(SendFileCommand)
+                .with(SendStreamCommand)
+                .with(StopStreamCommand),
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -83,8 +91,12 @@ impl<'a> Application<'a> {
                         self.process_network_message(endpoint, message);
                     }
                     NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) => self.state.disconnected_user(endpoint),
-                    NetEvent::DeserializationError(_) => ()
+                    NetEvent::RemovedEndpoint(endpoint) => {
+                        self.state.disconnected_user(endpoint);
+                        //If the endpoint was sending a stream make sure to close its window
+                        self.state.windows.remove(&endpoint);
+                    }
+                    NetEvent::DeserializationError(_) => (),
                 },
                 Event::Terminal(term_event) => {
                     self.process_terminal_event(term_event);
@@ -172,6 +184,30 @@ impl<'a> Application<'a> {
                     }
                 }
             }
+            NetMessage::Stream(data) => {
+                if let Some((data, width, height)) = data {
+                    if !self.state.windows.contains_key(&endpoint) {
+                        //This is a new stream so create the window and save it to state.windows
+                        match Window::new("Stream", width, height, WindowOptions::default()) {
+                            Ok(w) => {
+                                self.state.windows.insert(endpoint, w);
+                            }
+                            Err(e) => {
+                                e.to_string().report_err(&mut self.state);
+                            }
+                        }
+                    }
+                    if let Some(window) = self.state.windows.get_mut(&endpoint) {
+                        window
+                            .update_with_buffer(&data, width / 2, height)
+                            .report_if_err(&mut self.state);
+                    }
+                }
+                else {
+                    // Stream has finished clean up the window if we had it
+                    self.state.windows.remove(&endpoint);
+                }
+            }
         }
     }
 
@@ -201,11 +237,10 @@ impl<'a> Application<'a> {
                                 );
                                 self.state.add_message(message);
 
-                                self.network
-                                    .send_all(
-                                        self.state.all_user_endpoints(),
-                                        NetMessage::UserMessage(input.clone()),
-                                    );
+                                self.network.send_all(
+                                    self.state.all_user_endpoints(),
+                                    NetMessage::UserMessage(input.clone()),
+                                );
 
                                 if let Some(action) = action {
                                     self.process_action(action)

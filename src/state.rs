@@ -1,5 +1,5 @@
 use message_io::network::Endpoint;
-
+use minifb::Window;
 use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
@@ -47,6 +47,8 @@ pub struct State {
     lan_users: HashMap<Endpoint, String>,
     users_id: HashMap<String, usize>,
     last_user_id: usize,
+    pub stop_stream: bool,
+    pub windows: HashMap<Endpoint, Window>,
 }
 
 pub enum CursorMovement {
