@@ -6,7 +6,6 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
-#[cfg(target_os = "linux")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -58,19 +57,15 @@ impl<'a> Application<'a> {
             Ok(event) => sender.send(Event::Terminal(event)),
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
-        #[allow(unused_mut)]
-        let mut commands = CommandManager::default().with(SendFileCommand);
-
-        #[cfg(target_os = "linux")]
-        {
-            commands = commands.with(SendStreamCommand).with(StopStreamCommand);
-        }
 
         Ok(Application {
             config,
             state: State::default(),
             network,
-            commands,
+            commands: CommandManager::default()
+                .with(SendFileCommand)
+                .with(SendStreamCommand)
+                .with(StopStreamCommand),
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
