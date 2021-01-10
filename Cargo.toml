@@ -23,7 +23,8 @@ whoami = "0.9.0"
 chrono = "0.4.19"
 clap = "2.33.3"
 unicode-width = "0.1.8"
-minifb = "0.19.1"
+resize = "0.5.5"
+#minifb = "0.19.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.10.2"

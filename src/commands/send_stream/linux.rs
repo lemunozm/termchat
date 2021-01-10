@@ -51,28 +51,41 @@ impl Action for SendStream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-            return Processing::Completed
+            return Processing::Completed;
         }
         let data = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
                 network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-                return Processing::Completed
+                return Processing::Completed;
             }
         };
-        let data = data
-            .data()
-            .chunks_exact(4)
-            .map(|v| {
-                //safe unwrap due to chunks 4 making sure its a [u8;4]
-                let v = crate::util::yuyv_to_rgb(std::convert::TryFrom::try_from(v).unwrap());
-                u32::from_be_bytes(v)
-            })
-            .collect();
+        #[allow(non_snake_case)]
+        let data: Vec<u8> = data.chunks_exact(4).fold(vec![], |mut acc, v| {
+            // convert form YUYV to RGB
+            let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
+            let Y = Y as f32;
+            let U = U as f32;
+            let V = V as f32;
+
+            let b = 1.164 * (Y - 16.) + 2.018 * (U - 128.);
+
+            let g = 1.164 * (Y - 16.) - 0.813 * (V - 128.) - 0.391 * (U - 128.);
+
+            let r = 1.164 * (Y - 16.) + 1.596 * (V - 128.);
+            let r = r as u8;
+            let g = g as u8;
+            let b = b as u8;
+            acc.push(r);
+            acc.push(g);
+            acc.push(b);
+            acc
+        });
 
         let message = NetMessage::Stream(Some((data, self.width, self.height)));
         network.send_all(state.all_user_endpoints(), message);
+
         Processing::Partial
     }
 }

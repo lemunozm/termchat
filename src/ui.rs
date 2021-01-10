@@ -1,3 +1,7 @@
+use resize::Pixel::RGB24;
+use resize::Type::Lanczos3;
+use crate::state::Window;
+
 use super::state::{ProgressState, State, MessageType, SystemMessageType};
 use super::commands::{CommandManager};
 use super::util::{split_each};
@@ -17,16 +21,26 @@ pub fn draw(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chun
         .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
         .split(chunk);
 
-    draw_messages_panel(frame, state, chunks[0]);
-    draw_input_panel(frame, state, chunks[1]);
+    let upper_chunk = chunks[0];
+    if !state.windows.is_empty() {
+        let upper_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(0), Constraint::Length(30)].as_ref())
+            .split(upper_chunk);
+        draw_messages_panel(frame, state, upper_chunks[0]);
+        draw_video_panel(frame, state, upper_chunks[1]);
+        draw_input_panel(frame, state, chunks[1]);
+    } else {
+        draw_messages_panel(frame, state, chunks[0]);
+        draw_input_panel(frame, state, chunks[1]);
+    }
 }
 
 fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     state: &State,
     chunk: Rect,
-)
-{
+) {
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
@@ -36,8 +50,7 @@ fn draw_messages_panel(
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
                 MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
-            }
-            else {
+            } else {
                 Color::Green //because is a message of the own user
             };
             let date = message.date.format("%H:%M:%S ").to_string();
@@ -127,14 +140,12 @@ fn parse_content(content: &str) -> Vec<Span> {
             .map(|(index, part)| {
                 if index == 0 {
                     Span::styled(part, Style::default().fg(Color::LightYellow))
-                }
-                else {
+                } else {
                     Span::raw(format!(" {}", part))
                 }
             })
             .collect()
-    }
-    else {
+    } else {
         vec![Span::raw(content)]
     }
 }
@@ -161,4 +172,43 @@ fn draw_input_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &Sta
 
     let input_cursor = state.ui_input_cursor(inner_width);
     frame.set_cursor(chunk.x + 1 + input_cursor.0, chunk.y + 1 + input_cursor.1)
+}
+
+fn draw_video_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chunk: Rect) {
+    let windows = state.windows.values().collect();
+    frame.render_widget(FrameBuffer { windows }, chunk);
+}
+struct FrameBuffer<'a> {
+    windows: Vec<&'a Window>,
+}
+impl tui::widgets::Widget for FrameBuffer<'_> {
+    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer) {
+        let windows_num = self.windows.len();
+        let window_height = area.height / windows_num as u16;
+        for (idx, window) in self.windows.iter().enumerate() {
+            let area = Rect::new(area.x, window_height * idx as u16, area.width, window_height);
+
+            let mut resizer = resize::new(
+                window.width / 2,
+                window.height,
+                area.width as usize,
+                area.height as usize,
+                RGB24,
+                Lanczos3,
+            );
+            let mut dst = vec![0; (area.width * area.height) as usize * 3];
+            resizer.resize(&window.data, &mut dst);
+
+            let mut dst = dst.chunks(3);
+            for j in area.y..area.y + area.height {
+                for i in area.x..area.x + area.width {
+                    let cell = dst.next().unwrap();
+                    let r = cell[0];
+                    let g = cell[1];
+                    let b = cell[2];
+                    buf.get_mut(i, j).set_bg(Color::Rgb(r, g, b));
+                }
+            }
+        }
+    }
 }

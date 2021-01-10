@@ -1,5 +1,8 @@
 use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
-use crate::terminal_events::{TerminalEventCollector};
+use crate::{
+    state::Window,
+    terminal_events::{TerminalEventCollector},
+};
 use crate::renderer::{Renderer};
 use crate::action::{Action, Processing};
 use crate::commands::{CommandManager};
@@ -15,7 +18,6 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
-use minifb::{Window, WindowOptions};
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -186,24 +188,9 @@ impl<'a> Application<'a> {
             }
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
-                    if !self.state.windows.contains_key(&endpoint) {
-                        //This is a new stream so create the window and save it to state.windows
-                        match Window::new("Stream", width, height, WindowOptions::default()) {
-                            Ok(w) => {
-                                self.state.windows.insert(endpoint, w);
-                            }
-                            Err(e) => {
-                                e.to_string().report_err(&mut self.state);
-                            }
-                        }
-                    }
-                    if let Some(window) = self.state.windows.get_mut(&endpoint) {
-                        window
-                            .update_with_buffer(&data, width / 2, height)
-                            .report_if_err(&mut self.state);
-                    }
-                }
-                else {
+                    self.state.windows.entry(endpoint).or_insert(Window::new(width, height));
+                    self.state.update_window(&endpoint, data, width, height);
+                } else {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
                 }
@@ -222,8 +209,7 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    }
-                    else {
+                    } else {
                         self.state.input_write(character);
                     }
                 }
