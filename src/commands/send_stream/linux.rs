@@ -51,14 +51,14 @@ impl Action for SendStream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-            return Processing::Completed;
+            return Processing::Completed
         }
         let data = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
                 network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-                return Processing::Completed;
+                return Processing::Completed
             }
         };
         #[allow(non_snake_case)]

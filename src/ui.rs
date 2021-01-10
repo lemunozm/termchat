@@ -30,7 +30,8 @@ pub fn draw(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chun
         draw_messages_panel(frame, state, upper_chunks[0]);
         draw_video_panel(frame, state, upper_chunks[1]);
         draw_input_panel(frame, state, chunks[1]);
-    } else {
+    }
+    else {
         draw_messages_panel(frame, state, chunks[0]);
         draw_input_panel(frame, state, chunks[1]);
     }
@@ -40,7 +41,8 @@ fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     state: &State,
     chunk: Rect,
-) {
+)
+{
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
@@ -50,7 +52,8 @@ fn draw_messages_panel(
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
                 MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
-            } else {
+            }
+            else {
                 Color::Green //because is a message of the own user
             };
             let date = message.date.format("%H:%M:%S ").to_string();
@@ -140,12 +143,14 @@ fn parse_content(content: &str) -> Vec<Span> {
             .map(|(index, part)| {
                 if index == 0 {
                     Span::styled(part, Style::default().fg(Color::LightYellow))
-                } else {
+                }
+                else {
                     Span::raw(format!(" {}", part))
                 }
             })
             .collect()
-    } else {
+    }
+    else {
         vec![Span::raw(content)]
     }
 }
