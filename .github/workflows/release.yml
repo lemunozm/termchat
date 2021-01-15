@@ -133,7 +133,7 @@ jobs:
       
     - name: Build release binary
       run: |
-        cargo build --release
+        cargo build --release --all-features
 
     - name: Build archive
       shell: bash

@@ -9,6 +9,7 @@ use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
+#[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -60,14 +61,15 @@ impl<'a> Application<'a> {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
+        let commands = CommandManager::default().with(SendFileCommand);
+        #[cfg(feature = "stream-video")]
+        let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
+
         Ok(Application {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default()
-                .with(SendFileCommand)
-                .with(SendStreamCommand)
-                .with(StopStreamCommand),
+            commands,
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -190,8 +192,7 @@ impl<'a> Application<'a> {
                 if let Some((data, width, height)) = data {
                     self.state.windows.entry(endpoint).or_insert(Window::new(width, height));
                     self.state.update_window(&endpoint, data, width, height);
-                }
-                else {
+                } else {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
                 }
@@ -210,8 +211,7 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    }
-                    else {
+                    } else {
                         self.state.input_write(character);
                     }
                 }
