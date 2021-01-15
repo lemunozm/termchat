@@ -30,8 +30,7 @@ pub fn draw(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chun
         draw_messages_panel(frame, state, upper_chunks[0]);
         draw_video_panel(frame, state, upper_chunks[1]);
         draw_input_panel(frame, state, chunks[1]);
-    }
-    else {
+    } else {
         draw_messages_panel(frame, state, chunks[0]);
         draw_input_panel(frame, state, chunks[1]);
     }
@@ -41,8 +40,7 @@ fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     state: &State,
     chunk: Rect,
-)
-{
+) {
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state
@@ -52,8 +50,7 @@ fn draw_messages_panel(
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
                 MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
-            }
-            else {
+            } else {
                 Color::Green //because is a message of the own user
             };
             let date = message.date.format("%H:%M:%S ").to_string();
@@ -143,14 +140,12 @@ fn parse_content(content: &str) -> Vec<Span> {
             .map(|(index, part)| {
                 if index == 0 {
                     Span::styled(part, Style::default().fg(Color::LightYellow))
-                }
-                else {
+                } else {
                     Span::raw(format!(" {}", part))
                 }
             })
             .collect()
-    }
-    else {
+    } else {
         vec![Span::raw(content)]
     }
 }
@@ -181,17 +176,42 @@ fn draw_input_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &Sta
 
 fn draw_video_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chunk: Rect) {
     let windows = state.windows.values().collect();
-    frame.render_widget(FrameBuffer { windows }, chunk);
+    let fb = FrameBuffer::new(windows).block(Block::default().borders(Borders::ALL));
+    frame.render_widget(fb, chunk);
 }
+#[derive(Default)]
 struct FrameBuffer<'a> {
     windows: Vec<&'a Window>,
+    block: Option<Block<'a>>,
 }
+
+impl<'a> FrameBuffer<'a> {
+    fn new(windows: Vec<&'a Window>) -> Self {
+        Self { windows, ..Default::default() }
+    }
+    fn block(mut self, block: Block<'a>) -> FrameBuffer<'a> {
+        self.block = Some(block);
+        self
+    }
+}
+
 impl tui::widgets::Widget for FrameBuffer<'_> {
-    fn render(self, area: Rect, buf: &mut tui::buffer::Buffer) {
+    fn render(mut self, area: Rect, buf: &mut tui::buffer::Buffer) {
+        let area = match self.block.take() {
+            Some(b) => {
+                let inner_area = b.inner(area);
+                b.render(area, buf);
+                inner_area
+            }
+            None => area,
+        };
+
         let windows_num = self.windows.len();
         let window_height = area.height / windows_num as u16;
+        let y_start = area.y;
         for (idx, window) in self.windows.iter().enumerate() {
-            let area = Rect::new(area.x, window_height * idx as u16, area.width, window_height);
+            let area =
+                Rect::new(area.x, y_start + window_height * idx as u16, area.width, window_height);
 
             let mut resizer = resize::new(
                 window.width / 2,
