@@ -195,7 +195,8 @@ impl<'a> Application<'a> {
                         .entry(endpoint)
                         .or_insert_with(|| Window::new(width, height));
                     self.state.update_window(&endpoint, data, width, height);
-                } else {
+                }
+                else {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
                 }
@@ -214,7 +215,8 @@ impl<'a> Application<'a> {
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
                         self.event_queue.sender().send_with_priority(Event::Close(None));
-                    } else {
+                    }
+                    else {
                         self.state.input_write(character);
                     }
                 }

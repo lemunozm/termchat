@@ -7,6 +7,9 @@ use crate::util::{Result, Reportable};
 use message_io::network::{Network};
 use v4l::prelude::*;
 use v4l::FourCC;
+use v4l::buffer::Type;
+use v4l::io::traits::CaptureStream;
+use v4l::video::traits::Capture;
 
 // Send Stream logic
 
@@ -31,15 +34,14 @@ pub struct SendStream {
 
 impl SendStream {
     pub fn new() -> Result<SendStream> {
-        let mut dev = CaptureDevice::new(0).expect("Failed to open device");
-
+        let dev = Device::new(0).expect("Failed to open device");
         let mut fmt = dev.format()?;
         fmt.fourcc = FourCC::new(b"YUYV");
         let width = fmt.width as usize;
         let height = fmt.height as usize;
         dev.set_format(&fmt)?;
 
-        let stream = MmapStream::with_buffers(&dev, 4)?;
+        let stream = MmapStream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         Ok(SendStream { stream, width, height })
     }
@@ -51,14 +53,14 @@ impl Action for SendStream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-            return Processing::Completed
+            return Processing::Completed;
         }
-        let data = match self.stream.next() {
+        let (data, _metadata) = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
                 network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
-                return Processing::Completed
+                return Processing::Completed;
             }
         };
         #[allow(non_snake_case)]
