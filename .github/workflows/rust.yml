@@ -58,7 +58,7 @@ jobs:
       run: cargo build
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test default features
-      run: cargo test
+      run: cargo test --features stream-video
       continue-on-error: ${{ matrix.can-fail }}
 
     - name: Test Packaging
