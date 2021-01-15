@@ -190,7 +190,10 @@ impl<'a> Application<'a> {
             }
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
-                    self.state.windows.entry(endpoint).or_insert(Window::new(width, height));
+                    self.state
+                        .windows
+                        .entry(endpoint)
+                        .or_insert_with(|| Window::new(width, height));
                     self.state.update_window(&endpoint, data, width, height);
                 } else {
                     // Stream has finished clean up the window if we had it
