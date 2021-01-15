@@ -17,14 +17,14 @@ maintenance = { status = "actively-developed" }
 [dependencies]
 message-io = "0.5.1"
 serde = { version = "1.0.118", features = ["derive"] }
-crossterm = "0.19.0"
+#keep the same version as tui for faster compile time
+crossterm = "0.18.2"
 tui = { version = "0.14.0", default-features = false, features = ['crossterm'] }
 whoami = "1.0.3"
 chrono = "0.4.19"
 clap = "2.33.3"
 unicode-width = "0.1.8"
 resize = "0.5.5"
-#minifb = "0.19.1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = { version = "0.12.0", optional = true }
