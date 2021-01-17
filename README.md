@@ -20,7 +20,7 @@ Built on top of [tui-rs](https://github.com/fdehau/tui-rs) to create the termina
 You can use the [cargo][cargo] package manager in order to install it.
 
 ```
-$ cargo install termchat
+$ cargo install termchat --all-features
 ```
 On linux `libxkbcommon` is required (in order to stream videos).
 
