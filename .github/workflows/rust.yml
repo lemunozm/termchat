@@ -35,12 +35,6 @@ jobs:
       with:
         rust-version: ${{ matrix.rust }}
         components: rustfmt,clippy
-    - name: Install linux dependencies
-      shell: bash
-      run: |
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          sudo apt-get install libxkbcommon-dev
-        fi
     - name: Toolchain Information
       run: |
         rustc --version
