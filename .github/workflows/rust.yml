@@ -46,12 +46,13 @@ jobs:
       run: cargo fmt --all -- --check
       continue-on-error: ${{ matrix.can-fail }}
     - name: Clippy
-      run: cargo clippy -- -D clippy::all
+      run: cargo clippy --all-features -- -D clippy::all
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test Build
       run: cargo build --all-features
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test default features
+      # ui-test feature breaks ci, so we add each feature individually, example: --features featA,featB,featC
       run: cargo test --features stream-video
       continue-on-error: ${{ matrix.can-fail }}
 
