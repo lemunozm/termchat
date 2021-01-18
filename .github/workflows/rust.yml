@@ -49,7 +49,7 @@ jobs:
       run: cargo clippy -- -D clippy::all
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test Build
-      run: cargo build
+      run: cargo build --all-features
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test default features
       run: cargo test --features stream-video
@@ -57,5 +57,5 @@ jobs:
 
     - name: Test Packaging
       if: matrix.rust == 'stable'
-      run: cargo package
+      run: cargo package --all-features
       continue-on-error: ${{ matrix.can-fail }}
