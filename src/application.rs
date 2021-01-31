@@ -1,11 +1,15 @@
 use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
-use crate::terminal_events::{TerminalEventCollector};
+use crate::{
+    state::Window,
+    terminal_events::{TerminalEventCollector},
+};
 use crate::renderer::{Renderer};
 use crate::action::{Action, Processing};
 use crate::commands::{CommandManager};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
+#[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -15,7 +19,6 @@ use message_io::network::{NetEvent, Network, Endpoint};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
-use minifb::{Window, WindowOptions};
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -58,14 +61,15 @@ impl<'a> Application<'a> {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
+        let commands = CommandManager::default().with(SendFileCommand);
+        #[cfg(feature = "stream-video")]
+        let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
+
         Ok(Application {
             config,
             state: State::default(),
             network,
-            commands: CommandManager::default()
-                .with(SendFileCommand)
-                .with(SendStreamCommand)
-                .with(StopStreamCommand),
+            commands,
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
@@ -186,22 +190,11 @@ impl<'a> Application<'a> {
             }
             NetMessage::Stream(data) => {
                 if let Some((data, width, height)) = data {
-                    if !self.state.windows.contains_key(&endpoint) {
-                        //This is a new stream so create the window and save it to state.windows
-                        match Window::new("Stream", width, height, WindowOptions::default()) {
-                            Ok(w) => {
-                                self.state.windows.insert(endpoint, w);
-                            }
-                            Err(e) => {
-                                e.to_string().report_err(&mut self.state);
-                            }
-                        }
-                    }
-                    if let Some(window) = self.state.windows.get_mut(&endpoint) {
-                        window
-                            .update_with_buffer(&data, width / 2, height)
-                            .report_if_err(&mut self.state);
-                    }
+                    self.state
+                        .windows
+                        .entry(endpoint)
+                        .or_insert_with(|| Window::new(width, height));
+                    self.state.update_window(&endpoint, data, width, height);
                 }
                 else {
                     // Stream has finished clean up the window if we had it

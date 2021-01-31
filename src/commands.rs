@@ -1,4 +1,5 @@
 pub mod send_file;
+#[cfg(feature = "stream-video")]
 pub mod send_stream;
 
 use crate::action::{Action};

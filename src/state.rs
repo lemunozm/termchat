@@ -1,5 +1,4 @@
 use message_io::network::Endpoint;
-use minifb::Window;
 use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
@@ -38,6 +37,16 @@ impl ChatMessage {
     }
 }
 
+pub struct Window {
+    pub data: Vec<u8>,
+    pub width: usize,
+    pub height: usize,
+}
+impl Window {
+    pub fn new(width: usize, height: usize) -> Self {
+        Self { data: vec![], width, height }
+    }
+}
 #[derive(Default)]
 pub struct State {
     messages: Vec<ChatMessage>,
@@ -245,5 +254,18 @@ impl State {
             }
             _ => panic!("Must be a Progress MessageType"),
         }
+    }
+
+    pub fn update_window(
+        &mut self,
+        endpoint: &Endpoint,
+        data: Vec<u8>,
+        width: usize,
+        height: usize,
+    ) {
+        let window = self.windows.get_mut(endpoint).expect("Window should exist");
+        window.width = width;
+        window.height = height;
+        window.data = data;
     }
 }

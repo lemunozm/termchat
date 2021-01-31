@@ -108,13 +108,6 @@ jobs:
         override: true
         target: ${{ matrix.target }}
 
-    - name: Install linux dependencies
-      shell: bash
-      run: |
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          sudo apt-get install libxkbcommon-dev
-        fi
-
     - name: Get release download URL
       uses: actions/download-artifact@v1
       with:
@@ -133,7 +126,7 @@ jobs:
       
     - name: Build release binary
       run: |
-        cargo build --release
+        cargo build --release --all-features
 
     - name: Build archive
       shell: bash

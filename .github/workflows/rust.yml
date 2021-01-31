@@ -35,12 +35,6 @@ jobs:
       with:
         rust-version: ${{ matrix.rust }}
         components: rustfmt,clippy
-    - name: Install linux dependencies
-      shell: bash
-      run: |
-        if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-          sudo apt-get install libxkbcommon-dev
-        fi
     - name: Toolchain Information
       run: |
         rustc --version
@@ -52,16 +46,17 @@ jobs:
       run: cargo fmt --all -- --check
       continue-on-error: ${{ matrix.can-fail }}
     - name: Clippy
-      run: cargo clippy -- -D clippy::all
+      run: cargo clippy --all-features -- -D clippy::all
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test Build
-      run: cargo build
+      run: cargo build --all-features
       continue-on-error: ${{ matrix.can-fail }}
     - name: Test default features
-      run: cargo test
+      # ui-test feature breaks ci, so we add each feature individually, example: --features featA,featB,featC
+      run: cargo test --features stream-video
       continue-on-error: ${{ matrix.can-fail }}
 
     - name: Test Packaging
       if: matrix.rust == 'stable'
-      run: cargo package
+      run: cargo package --all-features
       continue-on-error: ${{ matrix.can-fail }}

@@ -7,13 +7,16 @@ use crate::util::{Result, Reportable};
 use message_io::network::{Network};
 use v4l::prelude::*;
 use v4l::FourCC;
+use v4l::buffer::Type;
+use v4l::io::traits::CaptureStream;
+use v4l::video::traits::Capture;
 
 // Send Stream logic
 
 pub struct SendStreamCommand;
 impl Command for SendStreamCommand {
     fn name(&self) -> &'static str {
-        "stream"
+        "startstream"
     }
 
     fn parse_params(&self, _params: &[&str]) -> Result<Box<dyn Action>> {
@@ -31,15 +34,14 @@ pub struct SendStream {
 
 impl SendStream {
     pub fn new() -> Result<SendStream> {
-        let mut dev = CaptureDevice::new(0).expect("Failed to open device");
-
+        let dev = Device::new(0).expect("Failed to open device");
         let mut fmt = dev.format()?;
         fmt.fourcc = FourCC::new(b"YUYV");
         let width = fmt.width as usize;
         let height = fmt.height as usize;
         dev.set_format(&fmt)?;
 
-        let stream = MmapStream::with_buffers(&dev, 4)?;
+        let stream = MmapStream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
         Ok(SendStream { stream, width, height })
     }
@@ -53,7 +55,7 @@ impl Action for SendStream {
             network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed
         }
-        let data = match self.stream.next() {
+        let (data, _metadata) = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
@@ -61,18 +63,31 @@ impl Action for SendStream {
                 return Processing::Completed
             }
         };
-        let data = data
-            .data()
-            .chunks_exact(4)
-            .map(|v| {
-                //safe unwrap due to chunks 4 making sure its a [u8;4]
-                let v = crate::util::yuyv_to_rgb(std::convert::TryFrom::try_from(v).unwrap());
-                u32::from_be_bytes(v)
-            })
-            .collect();
+        #[allow(non_snake_case)]
+        let data: Vec<u8> = data.chunks_exact(4).fold(vec![], |mut acc, v| {
+            // convert form YUYV to RGB
+            let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
+            let Y = Y as f32;
+            let U = U as f32;
+            let V = V as f32;
+
+            let b = 1.164 * (Y - 16.) + 2.018 * (U - 128.);
+
+            let g = 1.164 * (Y - 16.) - 0.813 * (V - 128.) - 0.391 * (U - 128.);
+
+            let r = 1.164 * (Y - 16.) + 1.596 * (V - 128.);
+            let r = r as u8;
+            let g = g as u8;
+            let b = b as u8;
+            acc.push(r);
+            acc.push(g);
+            acc.push(b);
+            acc
+        });
 
         let message = NetMessage::Stream(Some((data, self.width, self.height)));
         network.send_all(state.all_user_endpoints(), message);
+
         Processing::Partial
     }
 }
