@@ -1,5 +1,8 @@
 # Changelog
 
+## Release 1.2.0
+- Added ascii video (thanks to `sigmaSd`).
+
 ## Release 1.1.2
 - Fixed an issue that blocks the receiver of a file while the file was sending.
 - Fixed an issue that appended data to the end of the file once transfered.
