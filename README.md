@@ -13,7 +13,7 @@ Built on top of [tui-rs](https://github.com/fdehau/tui-rs) to create the termina
 [message-io](https://github.com/lemunozm/message-io) to make the network connections.
 
 <p align="center">
-  <img src="https://drive.google.com/uc?export=view&id=1EsyinitIujJ4DBxixbu9jZC3A5g0YBBn"/>
+  <img src="https://drive.google.com/uc?export=view&id=1nPsXwNm7cDr9-FtXmiO_lf0hJf5CVbuW"/>
 </p>
 
 # Installation
@@ -70,7 +70,7 @@ Termchat treats messages containings the following commands in a special way:
   example: `?send ./myfile`
 
   Note: The received files can be found in `/tmp/termchat/<termchat-username>/<file_name>`
-  
+
 - **`?startstream`**/**`?stopstream`**: starts/stops video stream and send it to all peers. Currently this is only supported on linux, the other platforms can only receive the video.
 
 ## Frequently Asked Questions
