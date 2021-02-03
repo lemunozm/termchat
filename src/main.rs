@@ -40,6 +40,12 @@ fn main() {
                 .default_value(&os_username)
                 .help("Name used as user idenfication"),
         )
+        .arg(
+            Arg::with_name("quiet-mode")
+                .long("quiet-mode")
+                .short("q")
+                .help("Disable the terminal bell sound"),
+        )
         .get_matches();
 
     // The next unwraps are safe because we specified a default value and a validator
@@ -47,6 +53,7 @@ fn main() {
         discovery_addr: matches.value_of("discovery").unwrap().parse().unwrap(),
         tcp_server_port: matches.value_of("tcp_server_port").unwrap().parse().unwrap(),
         user_name: matches.value_of("username").unwrap().into(),
+        terminal_bell: !matches.is_present("quiet-mode"),
     };
 
     let result = match Application::new(&config) {

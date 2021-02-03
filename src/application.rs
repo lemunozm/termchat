@@ -33,6 +33,7 @@ pub struct Config {
     pub discovery_addr: SocketAddrV4,
     pub tcp_server_port: u16,
     pub user_name: String,
+    pub terminal_bell: bool,
 }
 
 pub struct Application<'a> {
@@ -99,6 +100,7 @@ impl<'a> Application<'a> {
                         self.state.disconnected_user(endpoint);
                         //If the endpoint was sending a stream make sure to close its window
                         self.state.windows.remove(&endpoint);
+                        self.righ_the_bell();
                     }
                     NetEvent::DeserializationError(_) => (),
                 },
@@ -139,11 +141,13 @@ impl<'a> Application<'a> {
             // by tcp:
             NetMessage::HelloUser(user) => {
                 self.state.connected_user(endpoint, &user);
+                self.righ_the_bell();
             }
             NetMessage::UserMessage(content) => {
                 if let Some(user) = self.state.user_name(endpoint) {
                     let message = ChatMessage::new(user.into(), MessageType::Text(content));
                     self.state.add_message(message);
+                    self.righ_the_bell();
                 }
             }
             NetMessage::UserData(file_name, chunk) => {
@@ -163,6 +167,7 @@ impl<'a> Application<'a> {
                                 file_name, user
                             )
                             .report_info(&mut self.state);
+                            self.righ_the_bell();
                         }
                         Chunk::Data(data) => {
                             let try_write = || -> Result<()> {
@@ -288,5 +293,11 @@ impl<'a> Application<'a> {
 
     pub fn sender(&mut self) -> message_io::events::EventSender<Event> {
         self.event_queue.sender().clone()
+    }
+
+    pub fn righ_the_bell(&self) {
+        if self.config.terminal_bell {
+            print!("\x07");
+        }
     }
 }
