@@ -15,7 +15,7 @@ use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 use message_io::events::{EventQueue};
-use message_io::network::{NetEvent, Network, Endpoint};
+use message_io::network::{NetEvent, Network, Endpoint, Transport};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
@@ -81,10 +81,10 @@ impl<'a> Application<'a> {
         renderer.render(&self.state)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);
-        let (_, server_addr) = self.network.listen_tcp(server_addr)?;
-        self.network.listen_udp_multicast(self.config.discovery_addr)?;
+        let (_, server_addr) = self.network.listen(Transport::Tcp, server_addr)?;
+        self.network.listen(Transport::Udp, self.config.discovery_addr)?;
 
-        let discovery_endpoint = self.network.connect_udp(self.config.discovery_addr)?;
+        let discovery_endpoint = self.network.connect(Transport::Udp, self.config.discovery_addr)?;
         let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
         self.network.send(discovery_endpoint, message);
 
@@ -127,7 +127,7 @@ impl<'a> Application<'a> {
                 let server_addr = (endpoint.addr().ip(), server_port);
                 if user != self.config.user_name {
                     let mut try_connect = || -> Result<()> {
-                        let user_endpoint = self.network.connect_tcp(server_addr)?;
+                        let user_endpoint = self.network.connect(Transport::Tcp, server_addr)?;
                         let message = NetMessage::HelloUser(self.config.user_name.clone());
                         self.network.send(user_endpoint, message);
                         self.state.connected_user(user_endpoint, &user);

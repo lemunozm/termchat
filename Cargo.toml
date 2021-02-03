@@ -15,7 +15,7 @@ categories = ["command-line-utilities", "command-line-interface"]
 maintenance = { status = "actively-developed" }
 
 [dependencies]
-message-io = "0.5.1"
+message-io = "0.6.0"
 serde = { version = "1.0.118", features = ["derive"] }
 #keep the same version as tui for faster compile time
 crossterm = "0.18.2"
