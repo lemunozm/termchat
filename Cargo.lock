@@ -280,6 +280,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "dirs-next"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -297,6 +298,13 @@ checksum = "4ebda144c4fe02d1f7ea1a7d9641b6fc6b580adcfa024ae48797ecdeb6825b4d"
 dependencies = [
  "libc",
  "redox_users",
+=======
+name = "dl_api"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e8752073dc1bae5debb147497c1f0e92abe69b7680c97411e99bf77390967a3"
+dependencies = [
+>>>>>>> a754076 (stream audio)
  "winapi",
 ]
 
@@ -312,6 +320,12 @@ dependencies = [
  "regex",
  "termcolor",
 ]
+
+[[package]]
+name = "fon"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9716a0a1c5bba06eeccce22ff33a89dc961d88f02f0d450a55c1bade6cbcdd5"
 
 [[package]]
 name = "getrandom"
@@ -561,6 +575,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pasts"
+version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "681b1bd988e4321aa7e62f2dba46eb1be42d617a8e1fde616aa12bcaa9572f24"
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -784,6 +804,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7acad6f34eb9e8a259d3283d1e8c1d34d7415943d4895f65cc73813c7396fc85"
 
 [[package]]
+name = "smelling_salts"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20c925ab33283c5f0822c188122bb5508811c4c6d3024dc183bf221c2247cf3b"
+
+[[package]]
 name = "socket2"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -819,8 +845,13 @@ dependencies = [
  "chrono",
  "clap",
  "crossterm",
+<<<<<<< HEAD
  "dirs-next",
+=======
+ "fon",
+>>>>>>> b121e96 (stream audio)
  "message-io",
+ "pasts",
  "rand",
  "resize",
  "serde",
@@ -830,6 +861,7 @@ dependencies = [
  "tui",
  "unicode-width",
  "v4l",
+ "wavy",
  "whoami",
 ]
 
@@ -1003,6 +1035,19 @@ name = "wasm-bindgen-shared"
 version = "0.2.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e7811dd7f9398f14cc76efd356f98f03aa30419dea46aa810d71e819fc97158"
+
+[[package]]
+name = "wavy"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "46f6c040aad7139d96f4abb220f8df3a6b9eb6cba61c7c3f1bf3ec3cebf98081"
+dependencies = [
+ "dl_api",
+ "fon",
+ "smelling_salts",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"

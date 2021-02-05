@@ -1,3 +1,5 @@
+use fon::{stereo::Stereo32, Audio, Sink};
+use wavy::{Speakers, SpeakersSink};
 use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
 use crate::{
     state::Window,
@@ -11,6 +13,7 @@ use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
 #[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
+use crate::commands::send_audio::{SendAudioCommand, StopAudioCommand};
 use crate::config::Config;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -18,7 +21,9 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use message_io::events::{EventQueue};
 use message_io::network::{NetEvent, Network, Endpoint, Transport};
 
+use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
+const SAMPLE_RATE: f32 = 48_000.;
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -37,6 +42,7 @@ pub struct Application<'a> {
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
+    tx: std::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl<'a> Application<'a> {
@@ -55,9 +61,32 @@ impl<'a> Application<'a> {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
-        let commands = CommandManager::default().with(SendFileCommand);
+        let commands = CommandManager::default()
+            .with(SendFileCommand)
+            .with(SendAudioCommand)
+            .with(StopAudioCommand);
         #[cfg(feature = "stream-video")]
         let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
+
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let mut speakers = Speakers::default();
+            let mut buffer: Audio<Stereo32> = Audio::with_silence(SAMPLE_RATE, 0);
+            pasts::block_on(async move {
+                loop {
+                    let mut speakers: SpeakersSink<'_, Stereo32> = speakers.play().await;
+                    speakers.stream(buffer.drain());
+                    let data: Vec<u8> = rx.try_iter().flatten().collect();
+                    let data: Vec<f32> = data
+                        .chunks_exact(4)
+                        .map(|array| std::convert::TryFrom::try_from(array).unwrap())
+                        .map(f32::from_le_bytes)
+                        .collect();
+                    let mut audio: Audio<Stereo32> = Audio::with_f32_buffer(SAMPLE_RATE, data);
+                    buffer.extend(audio.drain());
+                }
+            });
+        });
 
         Ok(Application {
             config,
@@ -67,6 +96,7 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
+            tx,
         })
     }
 
@@ -199,6 +229,9 @@ impl<'a> Application<'a> {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
                 }
+            }
+            NetMessage::StreamAudio(audio) => {
+                self.tx.send(audio).unwrap();
             }
         }
     }

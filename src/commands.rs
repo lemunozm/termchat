@@ -1,6 +1,7 @@
 pub mod send_file;
 #[cfg(feature = "stream-video")]
 pub mod send_stream;
+pub mod send_audio;
 
 use crate::action::{Action};
 use crate::util::{Result};
