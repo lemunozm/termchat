@@ -205,9 +205,10 @@ impl<'a> Application<'a> {
                     self.state.windows.remove(&endpoint);
                 }
             }
-            NetMessage::StreamAudio(audio) => {
-                self.state.pulse_audio(audio);
-            }
+            NetMessage::StreamAudio(audio) => match audio {
+                Some(audio) => self.state.pulse_audio(audio),
+                None => self.state.stop_audio(),
+            },
         }
     }
 

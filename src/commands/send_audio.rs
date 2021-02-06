@@ -33,7 +33,7 @@ impl SendAudio {
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let mut microphone = Microphone::default();
-            pasts::block_on(async move {
+            futures::executor::block_on(async move {
                 loop {
                     let microphone = microphone.record().await;
                     let data =
@@ -43,7 +43,9 @@ impl SendAudio {
                             .map(|f| f.to_le_bytes().to_vec())
                             .flatten()
                             .collect::<Vec<u8>>();
-                    tx.send(data).unwrap();
+                    if tx.send(data).is_err() {
+                        break
+                    }
                 }
             });
         });
@@ -53,8 +55,20 @@ impl SendAudio {
 
 impl Action for SendAudio {
     fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
+        // if stop audio is true stop the audio stream
+        // SendAudio struct will be dropped with its receiver, so the sender will receive an error
+        // that will cause it to break out of the loop
+        if state.stop_audio {
+            // reset the flag
+            state.stop_audio = false;
+            // send None so the reciever nows that the stream has ended
+            let message = NetMessage::StreamAudio(None);
+            network.send_all(state.all_user_endpoints(), message);
+            return Processing::Completed
+        }
+
         let audio: Vec<u8> = self.rx.try_iter().flatten().collect();
-        let message = NetMessage::StreamAudio(audio);
+        let message = NetMessage::StreamAudio(Some(audio));
         network.send_all(state.all_user_endpoints(), message);
 
         Processing::Partial
@@ -76,7 +90,8 @@ impl Command for StopAudioCommand {
 }
 struct StopAudioStream {}
 impl Action for StopAudioStream {
-    fn process(&mut self, _state: &mut State, _network: &mut Network) -> Processing {
+    fn process(&mut self, state: &mut State, _network: &mut Network) -> Processing {
+        state.stop_audio = true;
         Processing::Completed
     }
 }

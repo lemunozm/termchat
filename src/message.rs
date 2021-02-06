@@ -14,5 +14,5 @@ pub enum NetMessage {
     UserMessage(String),                     // content
     UserData(String, Chunk),                 // file_name, chunk
     Stream(Option<(Vec<u8>, usize, usize)>), // Option of (stream_data width, height ) None means stream has ended
-    StreamAudio(Vec<u8>),
+    StreamAudio(Option<Vec<u8>>),            // Option of (stream_data) None means stream has ended
 }

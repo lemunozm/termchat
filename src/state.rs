@@ -51,10 +51,18 @@ impl Window {
     }
 }
 
-pub struct AudioStream(mpsc::Sender<Vec<u8>>);
+pub struct AudioStream {
+    tx: mpsc::Sender<Vec<u8>>,
+    tx_stop: mpsc::Sender<()>,
+}
+
 impl AudioStream {
     fn update(&self, audio: Vec<u8>) {
-        self.0.send(audio).unwrap();
+        self.tx.send(audio).unwrap();
+    }
+
+    fn stop(&self) {
+        self.tx_stop.send(()).unwrap();
     }
 }
 
@@ -68,6 +76,7 @@ pub struct State {
     users_id: HashMap<String, usize>,
     last_user_id: usize,
     pub stop_stream: bool,
+    pub stop_audio: bool,
     pub windows: HashMap<Endpoint, Window>,
     pub audio: Option<AudioStream>,
 }
@@ -283,13 +292,14 @@ impl State {
     }
 
     pub fn pulse_audio(&mut self, audio: Vec<u8>) {
-        fn start_audio() -> mpsc::Sender<Vec<u8>> {
+        fn start_audio() -> AudioStream {
             const SAMPLE_RATE: f32 = 48_000.;
             let (tx, rx) = mpsc::channel();
+            let (tx_stop, rx_stop) = mpsc::channel();
             std::thread::spawn(move || {
                 let mut speakers = Speakers::default();
                 let mut buffer: Audio<Stereo32> = Audio::with_silence(SAMPLE_RATE, 0);
-                pasts::block_on(async move {
+                futures::executor::block_on(async move {
                     loop {
                         let mut speakers: SpeakersSink<'_, Stereo32> = speakers.play().await;
                         speakers.stream(buffer.drain());
@@ -301,15 +311,24 @@ impl State {
                             .collect();
                         let mut audio: Audio<Stereo32> = Audio::with_f32_buffer(SAMPLE_RATE, data);
                         buffer.extend(audio.drain());
+                        if rx_stop.try_recv().is_ok() {
+                            break
+                        }
                     }
                 });
             });
-            tx
+            AudioStream { tx, tx_stop }
         }
         if self.audio.is_none() {
-            self.audio = Some(AudioStream(start_audio()));
+            self.audio = Some(start_audio());
         }
         // safe unwrap
         self.audio.as_ref().unwrap().update(audio);
+    }
+
+    pub fn stop_audio(&mut self) {
+        if let Some(audio) = self.audio.take() {
+            audio.stop();
+        }
     }
 }
