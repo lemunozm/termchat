@@ -1,7 +1,10 @@
 use message_io::network::Endpoint;
 use chrono::{DateTime, Local};
+use fon::{stereo::Stereo32, Audio, Sink};
+use wavy::{Speakers, SpeakersSink};
 
 use std::collections::HashMap;
+use std::sync::mpsc;
 
 #[derive(PartialEq)]
 pub enum SystemMessageType {
@@ -47,6 +50,14 @@ impl Window {
         Self { data: vec![], width, height }
     }
 }
+
+pub struct AudioStream(mpsc::Sender<Vec<u8>>);
+impl AudioStream {
+    fn update(&self, audio: Vec<u8>) {
+        self.0.send(audio).unwrap();
+    }
+}
+
 #[derive(Default)]
 pub struct State {
     messages: Vec<ChatMessage>,
@@ -58,6 +69,7 @@ pub struct State {
     last_user_id: usize,
     pub stop_stream: bool,
     pub windows: HashMap<Endpoint, Window>,
+    pub audio: Option<AudioStream>,
 }
 
 pub enum CursorMovement {
@@ -268,5 +280,36 @@ impl State {
         window.width = width;
         window.height = height;
         window.data = data;
+    }
+
+    pub fn pulse_audio(&mut self, audio: Vec<u8>) {
+        fn start_audio() -> mpsc::Sender<Vec<u8>> {
+            const SAMPLE_RATE: f32 = 48_000.;
+            let (tx, rx) = mpsc::channel();
+            std::thread::spawn(move || {
+                let mut speakers = Speakers::default();
+                let mut buffer: Audio<Stereo32> = Audio::with_silence(SAMPLE_RATE, 0);
+                pasts::block_on(async move {
+                    loop {
+                        let mut speakers: SpeakersSink<'_, Stereo32> = speakers.play().await;
+                        speakers.stream(buffer.drain());
+                        let data: Vec<u8> = rx.try_iter().flatten().collect();
+                        let data: Vec<f32> = data
+                            .chunks_exact(4)
+                            .map(|array| std::convert::TryFrom::try_from(array).unwrap())
+                            .map(f32::from_le_bytes)
+                            .collect();
+                        let mut audio: Audio<Stereo32> = Audio::with_f32_buffer(SAMPLE_RATE, data);
+                        buffer.extend(audio.drain());
+                    }
+                });
+            });
+            tx
+        }
+        if self.audio.is_none() {
+            self.audio = Some(AudioStream(start_audio()));
+        }
+        // safe unwrap
+        self.audio.as_ref().unwrap().update(audio);
     }
 }

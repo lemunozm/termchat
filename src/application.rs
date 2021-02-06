@@ -1,5 +1,3 @@
-use fon::{stereo::Stereo32, Audio, Sink};
-use wavy::{Speakers, SpeakersSink};
 use super::state::{State, CursorMovement, ChatMessage, MessageType, ScrollMovement};
 use crate::{
     state::Window,
@@ -23,7 +21,6 @@ use message_io::network::{NetEvent, Network, Endpoint, Transport};
 
 use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
-const SAMPLE_RATE: f32 = 48_000.;
 
 pub enum Event {
     Network(NetEvent<NetMessage>),
@@ -42,7 +39,6 @@ pub struct Application<'a> {
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
     event_queue: EventQueue<Event>,
-    tx: std::sync::mpsc::Sender<Vec<u8>>,
 }
 
 impl<'a> Application<'a> {
@@ -68,26 +64,6 @@ impl<'a> Application<'a> {
         #[cfg(feature = "stream-video")]
         let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
 
-        let (tx, rx) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let mut speakers = Speakers::default();
-            let mut buffer: Audio<Stereo32> = Audio::with_silence(SAMPLE_RATE, 0);
-            pasts::block_on(async move {
-                loop {
-                    let mut speakers: SpeakersSink<'_, Stereo32> = speakers.play().await;
-                    speakers.stream(buffer.drain());
-                    let data: Vec<u8> = rx.try_iter().flatten().collect();
-                    let data: Vec<f32> = data
-                        .chunks_exact(4)
-                        .map(|array| std::convert::TryFrom::try_from(array).unwrap())
-                        .map(f32::from_le_bytes)
-                        .collect();
-                    let mut audio: Audio<Stereo32> = Audio::with_f32_buffer(SAMPLE_RATE, data);
-                    buffer.extend(audio.drain());
-                }
-            });
-        });
-
         Ok(Application {
             config,
             state: State::default(),
@@ -96,7 +72,6 @@ impl<'a> Application<'a> {
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
             event_queue,
-            tx,
         })
     }
 
@@ -231,7 +206,7 @@ impl<'a> Application<'a> {
                 }
             }
             NetMessage::StreamAudio(audio) => {
-                self.tx.send(audio).unwrap();
+                self.state.pulse_audio(audio);
             }
         }
     }
