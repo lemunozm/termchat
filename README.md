@@ -12,9 +12,7 @@ Run the application in your terminal and write into the LAN!
 Built on top of [tui-rs](https://github.com/fdehau/tui-rs) to create the terminal UI and
 [message-io](https://github.com/lemunozm/message-io) to make the network connections.
 
-<p align="center">
-  <img src="https://drive.google.com/uc?export=view&id=1nPsXwNm7cDr9-FtXmiO_lf0hJf5CVbuW"/>
-</p>
+![](./screenshot.png)
 
 # Installation
 You can use the [cargo][cargo] package manager in order to install it.
