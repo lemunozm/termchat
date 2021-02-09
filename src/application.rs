@@ -84,7 +84,8 @@ impl<'a> Application<'a> {
         let (_, server_addr) = self.network.listen(Transport::Tcp, server_addr)?;
         self.network.listen(Transport::Udp, self.config.discovery_addr)?;
 
-        let discovery_endpoint = self.network.connect(Transport::Udp, self.config.discovery_addr)?;
+        let discovery_endpoint =
+            self.network.connect(Transport::Udp, self.config.discovery_addr)?;
         let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
         self.network.send(discovery_endpoint, message);
 
