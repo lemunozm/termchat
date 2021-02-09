@@ -80,3 +80,8 @@ Termchat treats messages containings the following commands in a special way:
 - Make sure that no firewall is running (example: ufw), and if that's the case either stop it or add termchat ports to the white list.
 
 - By default you need to allow port `5877/udp` and `port X/tcp`, `X` is a different with each run. Note that you can specify a custom tcp port as mentioned above and add it to the firewall whitelist.
+
+***Q:*** **Can I silence the terminal bell when I received a message?**
+
+***A:*** Yeah! You can run `termchat` passing the flag `--quiet-mode` or simple `-q`.
+

@@ -18,11 +18,13 @@ fn send_file() {
         discovery_addr: "238.255.0.1:5877".parse().unwrap(),
         tcp_server_port: "0".parse().unwrap(),
         user_name: 1.to_string(),
+        terminal_bell: false,
     };
     let config2: Config = Config {
         discovery_addr: "238.255.0.1:5877".parse().unwrap(),
         tcp_server_port: "0".parse().unwrap(),
         user_name: 2.to_string(),
+        terminal_bell: false,
     };
     let (mut s1, t1) = test_user(config1);
     // wait a bit or termchat will creates two-communication channels at the same time
