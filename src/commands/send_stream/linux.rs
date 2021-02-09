@@ -19,7 +19,7 @@ impl Command for SendStreamCommand {
         "startstream"
     }
 
-    fn parse_params(&self, _param: Option<&str>) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         match SendStream::new() {
             Ok(action) => Ok(Box::new(action)),
             Err(e) => Err(e),
@@ -101,7 +101,7 @@ impl Command for StopStreamCommand {
         "stopstream"
     }
 
-    fn parse_params(&self, _param: Option<&str>) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         Ok(Box::new(StopStream {}))
     }
 }

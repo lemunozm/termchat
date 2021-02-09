@@ -9,7 +9,7 @@ impl Command for SendStreamCommand {
         "stream"
     }
 
-    fn parse_params(&self, _param: Option<&str>) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         Err(format!("{} command is not supported on this platform.", self.name()).into())
     }
 }
@@ -19,7 +19,7 @@ impl Command for StopStreamCommand {
         "stopstream"
     }
 
-    fn parse_params(&self, _param: Option<&str>) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         Err(format!("{} command is not supported on this platform.", self.name()).into())
     }
 }

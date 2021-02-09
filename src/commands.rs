@@ -9,7 +9,7 @@ use std::collections::{HashMap};
 
 pub trait Command {
     fn name(&self) -> &'static str;
-    fn parse_params(&self, param: Option<&str>) -> Result<Box<dyn Action>>;
+    fn parse_params(&self, params: Vec<String>) -> Result<Box<dyn Action>>;
 }
 
 #[derive(Default)]
@@ -30,7 +30,11 @@ impl CommandManager {
             let mut input = input.splitn(2, char::is_whitespace);
             if let Some(first) = input.next() {
                 if let Some(parser) = self.parsers.get(first) {
-                    return Some(parser.parse_params(input.next()))
+                    let param_str = input.next().unwrap_or("");
+                    return match shellwords::split(param_str) {
+                        Ok(params) => Some(parser.parse_params(params)),
+                        Err(err) => Some(Err(err.into())),
+                    }
                 }
             }
         }
