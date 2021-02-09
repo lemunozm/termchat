@@ -1,7 +1,11 @@
 # Changelog
 
+## Current release
+- Added terminal bell when messages are received.
+- Added unix style paramters to commands. (by `zhongzc`)
+
 ## Release 1.2.0
-- Added ascii video (thanks to `sigmaSd`).
+- Added ascii video (by `sigmaSd`).
 
 ## Release 1.1.2
 - Fixed an issue that blocks the receiver of a file while the file was sending.
@@ -13,7 +17,7 @@
 - Fixed: If user write `? + <Enter>` now, not generate an error.
 
 ## Release 1.1.0
-- Send files command (thanks to sigmaSd)
+- Send files command (by `sigmaSd`)
 - Minor ui changes
 
 ## Release 1.0.0
