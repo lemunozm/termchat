@@ -1,6 +1,7 @@
 use crate::ui::{self};
 use crate::state::{State};
 use crate::util::{Result};
+use crate::config::Theme;
 
 use crossterm::terminal::{self};
 use crossterm::{ExecutableCommand};
@@ -22,8 +23,8 @@ impl<W: Write> Renderer<W> {
         Ok(Renderer { terminal: Terminal::new(CrosstermBackend::new(out))? })
     }
 
-    pub fn render(&mut self, state: &State) -> Result<()> {
-        self.terminal.draw(|frame| ui::draw(frame, state, frame.size()))?;
+    pub fn render(&mut self, state: &State, theme: &Theme) -> Result<()> {
+        self.terminal.draw(|frame| ui::draw(frame, state, frame.size(), theme))?;
         Ok(())
     }
 }

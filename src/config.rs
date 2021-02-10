@@ -2,6 +2,7 @@ use std::net::{SocketAddrV4};
 use clap::ArgMatches;
 use serde::{Serialize, Deserialize};
 use crate::util::Result;
+use tui::style::Color;
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -9,6 +10,7 @@ pub struct Config {
     pub tcp_server_port: u16,
     pub user_name: String,
     pub terminal_bell: bool,
+    pub theme: Theme,
 }
 
 impl Default for Config {
@@ -18,6 +20,7 @@ impl Default for Config {
             tcp_server_port: "0".parse().unwrap(),
             user_name: whoami::username(),
             terminal_bell: true,
+            theme: Theme::default(),
         }
     }
 }
@@ -75,5 +78,42 @@ impl Config {
         }
 
         config
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Theme {
+    pub message_colors: Vec<Color>,
+    pub my_user_color: Color,
+    pub date_color: Color,
+    pub system_info_color: (Color, Color),
+    pub system_warning_color: (Color, Color),
+    pub system_error_color: (Color, Color),
+    pub chat_panel_color: Color,
+    pub progress_bar_color: Color,
+    pub command_color: Color,
+    pub input_panel_color: Color,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Self::dark_theme()
+    }
+}
+
+impl Theme {
+    fn dark_theme() -> Self {
+        Self {
+            message_colors: vec![Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta],
+            my_user_color: Color::Green,
+            date_color: Color::DarkGray,
+            system_info_color: (Color::Cyan, Color::LightCyan),
+            system_warning_color: (Color::Yellow, Color::LightYellow),
+            system_error_color: (Color::Red, Color::LightRed),
+            chat_panel_color: Color::White,
+            progress_bar_color: Color::LightGreen,
+            command_color: Color::LightYellow,
+            input_panel_color: Color::White,
+        }
     }
 }

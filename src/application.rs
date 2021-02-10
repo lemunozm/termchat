@@ -72,7 +72,7 @@ impl<'a> Application<'a> {
 
     pub fn run(&mut self, out: impl std::io::Write) -> Result<()> {
         let mut renderer = Renderer::new(out)?;
-        renderer.render(&self.state)?;
+        renderer.render(&self.state, &self.config.theme)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);
         let (_, server_addr) = self.network.listen(Transport::Tcp, server_addr)?;
@@ -111,7 +111,7 @@ impl<'a> Application<'a> {
                     }
                 }
             }
-            renderer.render(&self.state)?;
+            renderer.render(&self.state, &self.config.theme)?;
         }
         //Renderer is destroyed here and the terminal is recovered
     }
