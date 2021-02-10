@@ -262,7 +262,8 @@ impl State {
         data: Vec<u8>,
         width: usize,
         height: usize,
-    ) {
+    )
+    {
         let window = self.windows.get_mut(endpoint).expect("Window should exist");
         window.width = width;
         window.height = height;

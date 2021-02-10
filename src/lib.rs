@@ -7,3 +7,4 @@ mod action;
 mod commands;
 mod ui;
 mod util;
+pub mod config;

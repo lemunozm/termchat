@@ -41,7 +41,8 @@ fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     state: &State,
     chunk: Rect,
-) {
+)
+{
     const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
 
     let messages = state

@@ -11,13 +11,13 @@ use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
 #[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
+use crate::config::Config;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
 use message_io::events::{EventQueue};
 use message_io::network::{NetEvent, Network, Endpoint, Transport};
 
-use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
 
 pub enum Event {
@@ -27,13 +27,6 @@ pub enum Event {
     // Close event with an optional error in case of failure
     // Close(None) means no error happened
     Close(Option<Error>),
-}
-
-pub struct Config {
-    pub discovery_addr: SocketAddrV4,
-    pub tcp_server_port: u16,
-    pub user_name: String,
-    pub terminal_bell: bool,
 }
 
 pub struct Application<'a> {
