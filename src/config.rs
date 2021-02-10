@@ -76,6 +76,15 @@ impl Config {
         if matches.value_of("quiet-mode").is_some() {
             config.terminal_bell = false;
         }
+        if let Some(theme) = matches.value_of("theme") {
+            let theme = theme.to_lowercase();
+            if theme == "dark" {
+                config.theme = Theme::dark_theme();
+            }
+            else {
+                config.theme = Theme::light_theme();
+            }
+        }
 
         config
     }
@@ -114,6 +123,21 @@ impl Theme {
             progress_bar_color: Color::LightGreen,
             command_color: Color::LightYellow,
             input_panel_color: Color::White,
+        }
+    }
+
+    fn light_theme() -> Self {
+        Self {
+            message_colors: vec![Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta],
+            my_user_color: Color::Green,
+            date_color: Color::DarkGray,
+            system_info_color: (Color::Cyan, Color::LightCyan),
+            system_warning_color: (Color::Yellow, Color::LightYellow),
+            system_error_color: (Color::Red, Color::LightRed),
+            chat_panel_color: Color::Black,
+            progress_bar_color: Color::LightGreen,
+            command_color: Color::LightYellow,
+            input_panel_color: Color::Black,
         }
     }
 }

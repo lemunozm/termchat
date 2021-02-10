@@ -14,6 +14,7 @@ fn main() {
             Arg::with_name("discovery")
                 .long("discovery")
                 .short("d")
+                .takes_value(true)
                 .validator(|addr| match addr.parse::<SocketAddrV4>() {
                     Ok(_) => Ok(()),
                     Err(_) => Err("The value must have syntax ipv4:port".into()),
@@ -24,6 +25,7 @@ fn main() {
             Arg::with_name("tcp_server_port")
                 .long("tcp-server-port")
                 .short("t")
+                .takes_value(true)
                 .validator(|port| match port.parse::<u16>() {
                     Ok(_) => Ok(()),
                     Err(_) => Err("The value must be in range 0..65535".into()),
@@ -33,6 +35,7 @@ fn main() {
         .arg(
             Arg::with_name("username")
                 .long("username")
+                .takes_value(true)
                 .short("u")
                 .help("Name used as user idenfication"),
         )
@@ -41,6 +44,16 @@ fn main() {
                 .long("quiet-mode")
                 .short("q")
                 .help("Disable the terminal bell sound"),
+        )
+        .arg(
+            Arg::with_name("theme")
+                .long("theme")
+                .validator(|theme| match theme.to_lowercase().as_str() {
+                    "dark" | "light" => Ok(()),
+                    _ => Err("Theme accepts only dark and light as value".into()),
+                })
+                .takes_value(true)
+                .help("Choose which theme should termchat use, values are dark and light"),
         )
         .get_matches();
 
