@@ -17,7 +17,7 @@ impl Command for SendAudioCommand {
         "sendaudio"
     }
 
-    fn parse_params(&self, _params: &[&str]) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         match SendAudio::new() {
             Ok(action) => Ok(Box::new(action)),
             Err(e) => Err(e),
@@ -84,7 +84,7 @@ impl Command for StopAudioCommand {
         "stopaudio"
     }
 
-    fn parse_params(&self, _params: &[&str]) -> Result<Box<dyn Action>> {
+    fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
         Ok(Box::new(StopAudioStream {}))
     }
 }
