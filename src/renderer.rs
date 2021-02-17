@@ -38,9 +38,7 @@ impl<W: Write> Drop for Renderer<W> {
         terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
         if std::thread::panicking() {
             eprintln!(
-                "{}, example: {}",
-                "termchat paniced, to log the error you can redirect stderror to a file",
-                "termchat 2> termchat_log"
+                "termchat paniced, to log the error you can redirect stderror to a file, example: termchat 2> termchat_log",
             );
         }
     }
