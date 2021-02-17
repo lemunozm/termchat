@@ -77,7 +77,6 @@ impl Config {
             config.terminal_bell = false;
         }
         if let Some(theme) = matches.value_of("theme") {
-            let theme = theme.to_lowercase();
             if theme == "dark" {
                 config.theme = Theme::dark_theme();
             }
