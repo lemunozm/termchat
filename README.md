@@ -71,6 +71,29 @@ Termchat treats messages containings the following commands in a special way:
 
 - **`?startstream`**/**`?stopstream`**: starts/stops video stream and send it to all peers. Currently this is only supported on linux, the other platforms can only receive the video.
 
+### Config
+Termchat store its configuration in a simple file located at `$ConfigDir/termchat/config`
+
+**Default config:**
+```
+discovery_addr = "238.255.0.1:5877"
+tcp_server_port = 0
+user_name = "my_awesome_user_name"
+terminal_bell = true
+
+[theme]
+message_colors = ["Blue", "Yellow", "Cyan", "Magenta"]
+my_user_color = "Green"
+date_color = "DarkGray"
+system_info_color = ["Cyan", "LightCyan"]
+system_warning_color = ["Yellow", "LightYellow"]
+system_error_color = ["Red", "LightRed"]
+chat_panel_color = "White"
+progress_bar_color = "LightGreen"
+command_color = "LightYellow"
+input_panel_color = "White"
+```
+
 ## Frequently Asked Questions
 
 ***Q:*** **Hosts are not disoverable**
@@ -85,3 +108,6 @@ Termchat treats messages containings the following commands in a special way:
 
 ***A:*** Yeah! You can run `termchat` passing the flag `--quiet-mode` or simple `-q`.
 
+***Q:*** **I can't see anything on my light themed desktop!!!**
+
+***A:*** You can use `termchat --theme light`, also you can customize colors individually via the config file.

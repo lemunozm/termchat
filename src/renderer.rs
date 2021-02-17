@@ -1,6 +1,7 @@
 use crate::ui::{self};
 use crate::state::{State};
 use crate::util::{Result};
+use crate::config::Theme;
 
 use crossterm::terminal::{self};
 use crossterm::{ExecutableCommand};
@@ -22,8 +23,8 @@ impl<W: Write> Renderer<W> {
         Ok(Renderer { terminal: Terminal::new(CrosstermBackend::new(out))? })
     }
 
-    pub fn render(&mut self, state: &State) -> Result<()> {
-        self.terminal.draw(|frame| ui::draw(frame, state, frame.size()))?;
+    pub fn render(&mut self, state: &State, theme: &Theme) -> Result<()> {
+        self.terminal.draw(|frame| ui::draw(frame, state, frame.size(), theme))?;
         Ok(())
     }
 }
@@ -37,9 +38,7 @@ impl<W: Write> Drop for Renderer<W> {
         terminal::disable_raw_mode().expect("Terminal doesn't support to disable raw mode");
         if std::thread::panicking() {
             eprintln!(
-                "{}, example: {}",
-                "termchat paniced, to log the error you can redirect stderror to a file",
-                "termchat 2> termchat_log"
+                "termchat paniced, to log the error you can redirect stderror to a file, example: termchat 2> termchat_log",
             );
         }
     }

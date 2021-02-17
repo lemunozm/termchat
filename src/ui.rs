@@ -1,6 +1,6 @@
 use resize::Pixel::RGB24;
 use resize::Type::Lanczos3;
-use crate::state::Window;
+use crate::{config::Theme, state::Window};
 
 use super::state::{ProgressState, State, MessageType, SystemMessageType};
 use super::commands::{CommandManager};
@@ -15,7 +15,13 @@ use tui::{Frame};
 
 use std::io::Write;
 
-pub fn draw(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chunk: Rect) {
+pub fn draw(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    state: &State,
+    chunk: Rect,
+    theme: &Theme,
+)
+{
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
@@ -27,13 +33,13 @@ pub fn draw(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chun
             .direction(Direction::Horizontal)
             .constraints([Constraint::Min(0), Constraint::Length(30)].as_ref())
             .split(upper_chunk);
-        draw_messages_panel(frame, state, upper_chunks[0]);
+        draw_messages_panel(frame, state, upper_chunks[0], theme);
         draw_video_panel(frame, state, upper_chunks[1]);
-        draw_input_panel(frame, state, chunks[1]);
+        draw_input_panel(frame, state, chunks[1], theme);
     }
     else {
-        draw_messages_panel(frame, state, chunks[0]);
-        draw_input_panel(frame, state, chunks[1]);
+        draw_messages_panel(frame, state, chunks[0], theme);
+        draw_input_panel(frame, state, chunks[1], theme);
     }
 }
 
@@ -41,8 +47,10 @@ fn draw_messages_panel(
     frame: &mut Frame<CrosstermBackend<impl Write>>,
     state: &State,
     chunk: Rect,
-) {
-    const MESSAGE_COLORS: [Color; 4] = [Color::Blue, Color::Yellow, Color::Cyan, Color::Magenta];
+    theme: &Theme,
+)
+{
+    let message_colors = &theme.message_colors;
 
     let messages = state
         .messages()
@@ -50,45 +58,47 @@ fn draw_messages_panel(
         .rev()
         .map(|message| {
             let color = if let Some(id) = state.users_id().get(&message.user) {
-                MESSAGE_COLORS[id % MESSAGE_COLORS.len()]
+                message_colors[id % message_colors.len()]
             }
             else {
-                Color::Green //because is a message of the own user
+                theme.my_user_color
             };
             let date = message.date.format("%H:%M:%S ").to_string();
             match &message.message_type {
                 MessageType::Connection => Spans::from(vec![
-                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(date, Style::default().fg(theme.date_color)),
                     Span::styled(&message.user, Style::default().fg(color)),
                     Span::styled(" is online", Style::default().fg(color)),
                 ]),
                 MessageType::Disconnection => Spans::from(vec![
-                    Span::styled(date, Style::default().fg(Color::DarkGray)),
+                    Span::styled(date, Style::default().fg(theme.date_color)),
                     Span::styled(&message.user, Style::default().fg(color)),
                     Span::styled(" is offline", Style::default().fg(color)),
                 ]),
                 MessageType::Text(content) => {
                     let mut ui_message = vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(date, Style::default().fg(theme.date_color)),
                         Span::styled(&message.user, Style::default().fg(color)),
                         Span::styled(": ", Style::default().fg(color)),
                     ];
-                    ui_message.extend(parse_content(content));
+                    ui_message.extend(parse_content(content, theme));
                     Spans::from(ui_message)
                 }
                 MessageType::System(content, msg_type) => {
                     let (user_color, content_color) = match msg_type {
-                        SystemMessageType::Info => (Color::Cyan, Color::LightCyan),
-                        SystemMessageType::Warning => (Color::Yellow, Color::LightYellow),
-                        SystemMessageType::Error => (Color::Red, Color::LightRed),
+                        SystemMessageType::Info => theme.system_info_color,
+                        SystemMessageType::Warning => theme.system_warning_color,
+                        SystemMessageType::Error => theme.system_error_color,
                     };
                     Spans::from(vec![
-                        Span::styled(date, Style::default().fg(Color::DarkGray)),
+                        Span::styled(date, Style::default().fg(theme.date_color)),
                         Span::styled(&message.user, Style::default().fg(user_color)),
                         Span::styled(content, Style::default().fg(content_color)),
                     ])
                 }
-                MessageType::Progress(state) => Spans::from(add_progress_bar(chunk.width, state)),
+                MessageType::Progress(state) => {
+                    Spans::from(add_progress_bar(chunk.width, state, theme))
+                }
             }
         })
         .collect::<Vec<_>>();
@@ -99,7 +109,7 @@ fn draw_messages_panel(
                 .borders(Borders::ALL)
                 .title(Span::styled("LAN Room", Style::default().add_modifier(Modifier::BOLD))),
         )
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(theme.chat_panel_color))
         .alignment(Alignment::Left)
         .scroll((state.scroll_messages_view() as u16, 0))
         .wrap(Wrap { trim: false });
@@ -107,8 +117,13 @@ fn draw_messages_panel(
     frame.render_widget(messages_panel, chunk);
 }
 
-fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
-    let color = Color::LightGreen;
+fn add_progress_bar<'a>(
+    panel_width: u16,
+    progress: &'a ProgressState,
+    theme: &Theme,
+) -> Vec<Span<'a>>
+{
+    let color = theme.progress_bar_color;
     let width = (panel_width - 20) as usize;
 
     let (title, ui_current, ui_remaining) = match progress {
@@ -133,7 +148,7 @@ fn add_progress_bar(panel_width: u16, progress: &ProgressState) -> Vec<Span> {
     ui_message
 }
 
-fn parse_content(content: &str) -> Vec<Span> {
+fn parse_content<'a>(content: &'a str, theme: &Theme) -> Vec<Span<'a>> {
     if content.starts_with(CommandManager::COMMAND_PREFIX) {
         // The content represents a command
         content
@@ -141,7 +156,7 @@ fn parse_content(content: &str) -> Vec<Span> {
             .enumerate()
             .map(|(index, part)| {
                 if index == 0 {
-                    Span::styled(part, Style::default().fg(Color::LightYellow))
+                    Span::styled(part, Style::default().fg(theme.command_color))
                 }
                 else {
                     Span::raw(format!(" {}", part))
@@ -154,7 +169,13 @@ fn parse_content(content: &str) -> Vec<Span> {
     }
 }
 
-fn draw_input_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &State, chunk: Rect) {
+fn draw_input_panel(
+    frame: &mut Frame<CrosstermBackend<impl Write>>,
+    state: &State,
+    chunk: Rect,
+    theme: &Theme,
+)
+{
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();
@@ -169,7 +190,7 @@ fn draw_input_panel(frame: &mut Frame<CrosstermBackend<impl Write>>, state: &Sta
                 .borders(Borders::ALL)
                 .title(Span::styled("Your message", Style::default().add_modifier(Modifier::BOLD))),
         )
-        .style(Style::default().fg(Color::White))
+        .style(Style::default().fg(theme.input_panel_color))
         .alignment(Alignment::Left);
 
     frame.render_widget(input_panel, chunk);
