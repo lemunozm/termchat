@@ -110,4 +110,4 @@ input_panel_color = "White"
 
 ***Q:*** **I can't see anything on my light themed desktop!!!**
 
-***A:*** You can use `termchat --theme light` also you can custimize colors individually via the config file
+***A:*** You can use `termchat --theme light`, also you can customize colors individually via the config file.
