@@ -74,7 +74,7 @@ Termchat treats messages containings the following commands in a special way:
 ### Config
 Termchat store its configuration in a simple file located at `$ConfigDir/termchat/config`
 
-Default config:
+**Default config:**
 ```
 discovery_addr = "238.255.0.1:5877"
 tcp_server_port = 0
@@ -108,5 +108,6 @@ input_panel_color = "White"
 
 ***A:*** Yeah! You can run `termchat` passing the flag `--quiet-mode` or simple `-q`.
 
-***Q*** I can't see anything on my light themed desktop!!!
-***A*** You can use `termchat --theme light` also you can custimize colors individually via the config file
+***Q:*** **I can't see anything on my light themed desktop!!!**
+
+***A:*** You can use `termchat --theme light` also you can custimize colors individually via the config file
