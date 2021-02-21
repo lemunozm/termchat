@@ -187,19 +187,18 @@ impl<'a> Application<'a> {
                     }
                 }
             }
-            NetMessage::Stream(data) => {
-                if let Some((data, width, height)) = data {
+            NetMessage::Stream(data) => match data {
+                Some((data, width, height)) if data.len() / 3 == width * height / 2 => {
                     self.state
                         .windows
                         .entry(endpoint)
                         .or_insert_with(|| Window::new(width, height));
                     self.state.update_window(&endpoint, data, width, height);
                 }
-                else {
-                    // Stream has finished clean up the window if we had it
+                _ => {
                     self.state.windows.remove(&endpoint);
                 }
-            }
+            },
         }
     }
 
