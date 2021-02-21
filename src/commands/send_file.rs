@@ -8,6 +8,7 @@ use message_io::network::{Network};
 
 use std::path::{Path};
 use std::io::{Read};
+use std::time::{Duration};
 
 pub struct SendFileCommand;
 
@@ -64,7 +65,9 @@ impl Action for SendFile {
         let (bytes_read, chunk, processing) = match self.file.read(&mut data) {
             Ok(0) => (0, Chunk::End, Processing::Completed),
             Ok(bytes_read) => {
-                (bytes_read, Chunk::Data(data[..bytes_read].to_vec()), Processing::Partial)
+                // We add a minor delay to introduce a rate in the sending.
+                let processing = Processing::Partial(Duration::from_micros(100));
+                (bytes_read, Chunk::Data(data[..bytes_read].to_vec()), processing)
             }
             Err(error) => {
                 format!("Error sending file. error: {}", error).report_err(state);

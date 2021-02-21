@@ -279,8 +279,8 @@ impl<'a> Application<'a> {
     fn process_action(&mut self, mut action: Box<dyn Action>) {
         match action.process(&mut self.state, &mut self.network) {
             Processing::Completed => (),
-            Processing::Partial => {
-                self.event_queue.sender().send(Event::Action(action));
+            Processing::Partial(delay) => {
+                self.event_queue.sender().send_with_timer(Event::Action(action), delay);
             }
         }
     }

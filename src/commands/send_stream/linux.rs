@@ -11,6 +11,8 @@ use v4l::buffer::Type;
 use v4l::io::traits::CaptureStream;
 use v4l::video::traits::Capture;
 
+use std::time::{Duration};
+
 // Send Stream logic
 
 pub struct SendStreamCommand;
@@ -88,7 +90,7 @@ impl Action for SendStream {
         let message = NetMessage::Stream(Some((data, self.width, self.height)));
         network.send_all(state.all_user_endpoints(), message);
 
-        Processing::Partial
+        Processing::Partial(Duration::from_millis(16)) //~60fps - delay of computation
     }
 }
 
