@@ -4,6 +4,7 @@
 - Added terminal bell when messages are received.
 - Added unix style paramters to commands. (by `zhongzc`)
 - Minor internal improvements to reduce CPU.
+- Unknown error notified.
 
 ## Release 1.2.0
 - Added ascii video (by `sigmaSd`).
