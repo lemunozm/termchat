@@ -11,6 +11,7 @@ use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
 #[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
+#[cfg(feature = "stream-audio")]
 use crate::commands::send_audio::{SendAudioCommand, StopAudioCommand};
 use crate::config::Config;
 
@@ -19,7 +20,6 @@ use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 use message_io::events::{EventQueue};
 use message_io::network::{NetEvent, Network, Endpoint, Transport};
 
-use std::net::{SocketAddrV4};
 use std::io::{ErrorKind};
 
 pub enum Event {
@@ -57,10 +57,11 @@ impl<'a> Application<'a> {
             Err(e) => sender.send(Event::Close(Some(e))),
         })?;
 
-        let commands = CommandManager::default()
-            .with(SendFileCommand)
-            .with(SendAudioCommand)
-            .with(StopAudioCommand);
+        let commands = CommandManager::default().with(SendFileCommand);
+
+        #[cfg(feature = "stream-audio")]
+        let commands = commands.with(SendAudioCommand).with(StopAudioCommand);
+
         #[cfg(feature = "stream-video")]
         let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
 
@@ -205,10 +206,15 @@ impl<'a> Application<'a> {
                     self.state.windows.remove(&endpoint);
                 }
             }
-            NetMessage::StreamAudio(audio) => match audio {
-                Some(audio) => self.state.pulse_audio(audio),
-                None => self.state.stop_audio(),
-            },
+            #[allow(unused_variables)]
+            NetMessage::StreamAudio(audio) =>
+            {
+                #[cfg(feature = "stream-audio")]
+                match audio {
+                    Some(audio) => self.state.pulse_audio(audio),
+                    None => self.state.stop_audio(),
+                }
+            }
         }
     }
 

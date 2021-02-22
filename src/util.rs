@@ -93,3 +93,46 @@ impl Reportable for String {
         state.add_system_warn_message(self);
     }
 }
+
+#[macro_export]
+///Generate commands for unsupported platforms
+///It expects the names to end with `Command` for example  `generate_unsupported!(MystartnameCommand MystopnameCommand)`
+macro_rules! generate_unsupported {
+    ($start_command: ident $stop_command: ident) => {
+        #[cfg(not(target_os = "linux"))]
+        pub mod other {
+            const COMMAND_STR: &str = "Command";
+            use crate::commands::{Command, Action};
+            use crate::util::Result;
+
+            pub struct $start_command; //unimplemented
+            pub struct $stop_command; //unimplemented
+
+            impl Command for $start_command {
+                fn name(&self) -> &'static str {
+                    let cmd = stringify!($start_command);
+                    Box::leak(Box::new(cmd[0..cmd.len() - COMMAND_STR.len()].to_lowercase()))
+                }
+
+                fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
+                    Err(format!("{} command is not supported on this platform.", self.name())
+                        .into())
+                }
+            }
+
+            impl Command for $stop_command {
+                fn name(&self) -> &'static str {
+                    let cmd = stringify!($stop_command);
+                    Box::leak(Box::new(cmd[0..cmd.len() - COMMAND_STR.len()].to_lowercase()))
+                }
+
+                fn parse_params(&self, _params: Vec<String>) -> Result<Box<dyn Action>> {
+                    Err(format!("{} command is not supported on this platform.", self.name())
+                        .into())
+                }
+            }
+        }
+        #[cfg(not(target_os = "linux"))]
+        pub use other::*;
+    };
+}
