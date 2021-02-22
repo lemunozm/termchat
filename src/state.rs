@@ -3,6 +3,11 @@ use chrono::{DateTime, Local};
 
 use std::collections::HashMap;
 
+#[cfg(feature = "stream-audio")]
+mod audio;
+#[cfg(feature = "stream-audio")]
+use audio::AudioStream;
+
 #[derive(PartialEq)]
 pub enum SystemMessageType {
     Info,
@@ -47,6 +52,7 @@ impl Window {
         Self { data: vec![], width, height }
     }
 }
+
 #[derive(Default)]
 pub struct State {
     messages: Vec<ChatMessage>,
@@ -57,7 +63,10 @@ pub struct State {
     users_id: HashMap<String, usize>,
     last_user_id: usize,
     pub stop_stream: bool,
+    pub stop_audio: bool,
     pub windows: HashMap<Endpoint, Window>,
+    #[cfg(feature = "stream-audio")]
+    pub audio: Option<AudioStream>,
 }
 
 pub enum CursorMovement {
@@ -262,8 +271,7 @@ impl State {
         data: Vec<u8>,
         width: usize,
         height: usize,
-    )
-    {
+    ) {
         let window = self.windows.get_mut(endpoint).expect("Window should exist");
         window.width = width;
         window.height = height;

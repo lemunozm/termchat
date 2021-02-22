@@ -20,8 +20,7 @@ pub fn draw(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
@@ -48,8 +47,7 @@ fn draw_messages_panel(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let message_colors = &theme.message_colors;
 
     let messages = state
@@ -81,6 +79,10 @@ fn draw_messages_panel(
                         Span::styled(&message.user, Style::default().fg(color)),
                         Span::styled(": ", Style::default().fg(color)),
                     ];
+                    #[cfg(feature = "stream-audio")]
+                    if state.is_streming_audio(&message.user) {
+                        ui_message.insert(1, Span::styled(" ", Style::default().fg(color)));
+                    }
                     ui_message.extend(parse_content(content, theme));
                     Spans::from(ui_message)
                 }
@@ -121,8 +123,7 @@ fn add_progress_bar<'a>(
     panel_width: u16,
     progress: &'a ProgressState,
     theme: &Theme,
-) -> Vec<Span<'a>>
-{
+) -> Vec<Span<'a>> {
     let color = theme.progress_bar_color;
     let width = (panel_width - 20) as usize;
 
@@ -174,8 +175,7 @@ fn draw_input_panel(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();

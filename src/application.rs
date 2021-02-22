@@ -11,6 +11,8 @@ use crate::util::{Error, Result, Reportable};
 use crate::commands::send_file::{SendFileCommand};
 #[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
+#[cfg(feature = "stream-audio")]
+use crate::commands::send_audio::{SendAudioCommand, StopAudioCommand};
 use crate::config::Config;
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
@@ -56,6 +58,10 @@ impl<'a> Application<'a> {
         })?;
 
         let commands = CommandManager::default().with(SendFileCommand);
+
+        #[cfg(feature = "stream-audio")]
+        let commands = commands.with(SendAudioCommand).with(StopAudioCommand);
+
         #[cfg(feature = "stream-video")]
         let commands = commands.with(SendStreamCommand).with(StopStreamCommand);
 
@@ -198,6 +204,15 @@ impl<'a> Application<'a> {
                 else {
                     // Stream has finished clean up the window if we had it
                     self.state.windows.remove(&endpoint);
+                }
+            }
+            #[allow(unused_variables)]
+            NetMessage::StreamAudio(audio) =>
+            {
+                #[cfg(feature = "stream-audio")]
+                match audio {
+                    Some(audio) => self.state.pulse_audio(audio, endpoint),
+                    None => self.state.stop_audio(endpoint),
                 }
             }
         }
