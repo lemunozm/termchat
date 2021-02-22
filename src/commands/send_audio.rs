@@ -4,6 +4,7 @@ use crate::state::{State};
 use crate::message::{NetMessage};
 use crate::util::{Result};
 use std::sync::mpsc;
+use std::time::Duration;
 
 use message_io::network::{Network};
 use fon::{stereo::Stereo32, Audio};
@@ -44,7 +45,7 @@ impl SendAudio {
                             .flatten()
                             .collect::<Vec<u8>>();
                     if tx.send(data).is_err() {
-                        break
+                        break;
                     }
                 }
             });
@@ -64,14 +65,14 @@ impl Action for SendAudio {
             // send None so the reciever nows that the stream has ended
             let message = NetMessage::StreamAudio(None);
             network.send_all(state.all_user_endpoints(), message);
-            return Processing::Completed
+            return Processing::Completed;
         }
 
         let audio: Vec<u8> = self.rx.try_iter().flatten().collect();
         let message = NetMessage::StreamAudio(Some(audio));
         network.send_all(state.all_user_endpoints(), message);
 
-        Processing::Partial
+        Processing::Partial(Duration::from_millis(10))
     }
 }
 
