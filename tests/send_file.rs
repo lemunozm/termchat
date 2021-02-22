@@ -1,6 +1,7 @@
 #![cfg(feature = "ui-test")]
 
-use termchat::application::{Application, Event, Config};
+use termchat::application::{Application, Event};
+use termchat::config::Config;
 use message_io::events::EventSender;
 
 #[test]
@@ -14,18 +15,8 @@ fn send_file() {
     std::fs::write(&test_path, &data).unwrap();
 
     // spawn users
-    let config1: Config = Config {
-        discovery_addr: "238.255.0.1:5877".parse().unwrap(),
-        tcp_server_port: "0".parse().unwrap(),
-        user_name: 1.to_string(),
-        terminal_bell: false,
-    };
-    let config2: Config = Config {
-        discovery_addr: "238.255.0.1:5877".parse().unwrap(),
-        tcp_server_port: "0".parse().unwrap(),
-        user_name: 2.to_string(),
-        terminal_bell: false,
-    };
+    let config1: Config = Config { user_name: 1.to_string(), ..Config::default() };
+    let config2: Config = Config { user_name: 2.to_string(), ..Config::default() };
     let (mut s1, t1) = test_user(config1);
     // wait a bit or termchat will creates two-communication channels at the same time
     std::thread::sleep(std::time::Duration::from_millis(100));
