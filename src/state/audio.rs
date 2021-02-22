@@ -73,6 +73,19 @@ pub mod linux {
                 }
             }
         }
+
+        pub fn is_streming_audio(&self, user: &str) -> bool {
+            if self.audio.is_none() {
+                return false
+            }
+            // safe unwrap
+            for (endpoint, u) in &self.lan_users {
+                if user == u && self.audio.as_ref().unwrap().users.contains(&endpoint) {
+                    return true
+                }
+            }
+            false
+        }
     }
 }
 #[cfg(target_os = "linux")]
@@ -86,6 +99,10 @@ pub mod other {
         pub fn pulse_audio(&mut self, _audio: Vec<u8>, _user: Endpoint) {}
 
         pub fn stop_audio(&mut self, _user: Endpoint) {}
+
+        pub fn is_streming_audio(&self, _user: &str) -> bool {
+            false
+        }
     }
 }
 #[cfg(not(target_os = "linux"))]
