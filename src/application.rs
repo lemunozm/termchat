@@ -211,8 +211,8 @@ impl<'a> Application<'a> {
             {
                 #[cfg(feature = "stream-audio")]
                 match audio {
-                    Some(audio) => self.state.pulse_audio(audio),
-                    None => self.state.stop_audio(),
+                    Some(audio) => self.state.pulse_audio(audio, endpoint),
+                    None => self.state.stop_audio(endpoint),
                 }
             }
         }

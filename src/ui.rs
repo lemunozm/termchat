@@ -57,7 +57,9 @@ fn draw_messages_panel(
         .iter()
         .rev()
         .map(|message| {
-            let color = if let Some(id) = state.users_id().get(&message.user) {
+            // user_id.is_none() -> our user
+            let user_id = state.users_id().get(&message.user);
+            let color = if let Some(id) = user_id {
                 message_colors[id % message_colors.len()]
             }
             else {
@@ -81,6 +83,10 @@ fn draw_messages_panel(
                         Span::styled(&message.user, Style::default().fg(color)),
                         Span::styled(": ", Style::default().fg(color)),
                     ];
+                    #[cfg(feature = "stream-audio")]
+                    if user_id.is_some() && state.audio.is_some() {
+                        ui_message.insert(1, Span::styled(" ", Style::default().fg(color)));
+                    }
                     ui_message.extend(parse_content(content, theme));
                     Spans::from(ui_message)
                 }

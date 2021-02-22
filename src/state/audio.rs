@@ -2,12 +2,14 @@
 pub mod linux {
     use fon::{stereo::Stereo32, Audio, Sink};
     use wavy::{Speakers, SpeakersSink};
+    use super::super::{Endpoint, State};
     use std::sync::mpsc;
-    use super::super::State;
+    use std::collections::HashSet;
 
     pub struct AudioStream {
         tx: mpsc::Sender<Vec<u8>>,
         tx_stop: mpsc::Sender<()>,
+        users: HashSet<Endpoint>,
     }
 
     impl AudioStream {
@@ -21,7 +23,7 @@ pub mod linux {
     }
 
     impl State {
-        pub fn pulse_audio(&mut self, audio: Vec<u8>) {
+        pub fn pulse_audio(&mut self, audio: Vec<u8>, user: Endpoint) {
             fn start_audio() -> AudioStream {
                 const SAMPLE_RATE: f32 = 48_000.;
                 let (tx, rx) = mpsc::channel();
@@ -48,18 +50,27 @@ pub mod linux {
                         }
                     });
                 });
-                AudioStream { tx, tx_stop }
+                AudioStream { tx, tx_stop, users: HashSet::new() }
             }
             if self.audio.is_none() {
                 self.audio = Some(start_audio());
             }
             // safe unwrap
             self.audio.as_ref().unwrap().update(audio);
+            self.audio.as_mut().unwrap().users.insert(user);
         }
 
-        pub fn stop_audio(&mut self) {
-            if let Some(audio) = self.audio.take() {
-                audio.stop();
+        pub fn stop_audio(&mut self, user: Endpoint) {
+            if let Some(mut audio) = self.audio.take() {
+                audio.users.remove(&user);
+                // if users is empty that means all streams have ended
+                if audio.users.is_empty() {
+                    audio.stop();
+                }
+                else {
+                    // else continue the steram
+                    self.audio = Some(audio);
+                }
             }
         }
     }
@@ -69,11 +80,12 @@ pub use linux::*;
 
 #[cfg(not(target_os = "linux"))]
 pub mod other {
+    use super::super::{Endpoint, State};
     pub struct AudioStream;
-    impl super::super::State {
-        pub fn pulse_audio(&mut self, _audio: Vec<u8>) {}
+    impl State {
+        pub fn pulse_audio(&mut self, _audio: Vec<u8>, _user: Endpoint) {}
 
-        pub fn stop_audio(&mut self) {}
+        pub fn stop_audio(&mut self, _user: Endpoint) {}
     }
 }
 #[cfg(not(target_os = "linux"))]
