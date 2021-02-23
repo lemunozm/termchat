@@ -234,8 +234,10 @@ impl<'a> Application<'a> {
                                     NetMessage::UserMessage(input.clone()),
                                 );
 
-                                if let Some(action) = action {
-                                    self.process_action(action)
+                                match action {
+                                    Some(action) => self.process_action(action),
+                                    None => String::from("This command doesn't exists")
+                                        .report_err(&mut self.state),
                                 }
                             }
                             Err(error) => {
