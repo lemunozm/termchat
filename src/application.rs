@@ -188,7 +188,7 @@ impl<'a> Application<'a> {
                 }
             }
             NetMessage::Stream(data) => match data {
-                Some((data, width, height)) if data.len() / 3 == width * height / 2 => {
+                Some((data, width, height)) if data.len() == width * height / 2 => {
                     self.state
                         .windows
                         .entry(endpoint)

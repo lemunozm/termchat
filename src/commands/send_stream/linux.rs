@@ -5,6 +5,8 @@ use crate::message::{NetMessage};
 use crate::util::{Result, Reportable};
 
 use message_io::network::{Network};
+use resize::px::RGB;
+use rgb::RGB8;
 use v4l::prelude::*;
 use v4l::FourCC;
 use v4l::buffer::Type;
@@ -66,7 +68,7 @@ impl Action for SendStream {
             }
         };
         #[allow(non_snake_case)]
-        let data: Vec<u8> = data.chunks_exact(4).fold(vec![], |mut acc, v| {
+        let data: Vec<RGB8> = data.chunks_exact(4).fold(vec![], |mut acc, v| {
             // convert form YUYV to RGB
             let [Y, U, _, V]: [u8; 4] = std::convert::TryFrom::try_from(v).unwrap();
             let Y = Y as f32;
@@ -81,9 +83,8 @@ impl Action for SendStream {
             let r = r as u8;
             let g = g as u8;
             let b = b as u8;
-            acc.push(r);
-            acc.push(g);
-            acc.push(b);
+
+            acc.push(RGB::new(r, g, b));
             acc
         });
 

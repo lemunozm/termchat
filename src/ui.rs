@@ -1,4 +1,4 @@
-use resize::Pixel::RGB24;
+use resize::{Pixel::RGB8, px::RGB};
 use resize::Type::Lanczos3;
 use crate::{config::Theme, state::Window};
 
@@ -20,8 +20,7 @@ pub fn draw(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([Constraint::Min(0), Constraint::Length(6)].as_ref())
@@ -48,8 +47,7 @@ fn draw_messages_panel(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let message_colors = &theme.message_colors;
 
     let messages = state
@@ -121,8 +119,7 @@ fn add_progress_bar<'a>(
     panel_width: u16,
     progress: &'a ProgressState,
     theme: &Theme,
-) -> Vec<Span<'a>>
-{
+) -> Vec<Span<'a>> {
     let color = theme.progress_bar_color;
     let width = (panel_width - 20) as usize;
 
@@ -174,8 +171,7 @@ fn draw_input_panel(
     state: &State,
     chunk: Rect,
     theme: &Theme,
-)
-{
+) {
     let inner_width = (chunk.width - 2) as usize;
 
     let input = state.input().iter().collect::<String>();
@@ -244,19 +240,20 @@ impl tui::widgets::Widget for FrameBuffer<'_> {
                 window.height,
                 area.width as usize,
                 area.height as usize,
-                RGB24,
+                RGB8,
                 Lanczos3,
-            );
-            let mut dst = vec![0; (area.width * area.height) as usize * 3];
-            resizer.resize(&window.data, &mut dst);
+            )
+            .unwrap();
+            let mut dst = vec![RGB::new(0, 0, 0); (area.width * area.height) as usize];
+            resizer.resize(&window.data, &mut dst).unwrap();
 
-            let mut dst = dst.chunks(3);
+            let mut dst = dst.iter();
             for j in area.y..area.y + area.height {
                 for i in area.x..area.x + area.width {
-                    let cell = dst.next().unwrap();
-                    let r = cell[0];
-                    let g = cell[1];
-                    let b = cell[2];
+                    let rgb = dst.next().unwrap();
+                    let r = rgb.r;
+                    let g = rgb.g;
+                    let b = rgb.b;
                     buf.get_mut(i, j).set_bg(Color::Rgb(r, g, b));
                 }
             }
