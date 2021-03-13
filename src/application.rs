@@ -235,8 +235,12 @@ impl<'a> Application<'a> {
 
                                 match action {
                                     Some(action) => self.process_action(action),
-                                    None => String::from("This command doesn't exists")
-                                        .report_err(&mut self.state),
+                                    None => {
+                                        if input.starts_with('?') {
+                                            String::from("This command doesn't exists")
+                                                .report_err(&mut self.state);
+                                        }
+                                    }
                                 }
                             }
                             Err(error) => {
