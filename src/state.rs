@@ -1,5 +1,6 @@
 use message_io::network::Endpoint;
 use chrono::{DateTime, Local};
+use rgb::RGB8;
 
 use std::collections::HashMap;
 
@@ -38,7 +39,7 @@ impl ChatMessage {
 }
 
 pub struct Window {
-    pub data: Vec<u8>,
+    pub data: Vec<RGB8>,
     pub width: usize,
     pub height: usize,
 }
@@ -259,11 +260,10 @@ impl State {
     pub fn update_window(
         &mut self,
         endpoint: &Endpoint,
-        data: Vec<u8>,
+        data: Vec<RGB8>,
         width: usize,
         height: usize,
-    )
-    {
+    ) {
         let window = self.windows.get_mut(endpoint).expect("Window should exist");
         window.width = width;
         window.height = height;
