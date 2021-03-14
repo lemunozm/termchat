@@ -64,7 +64,7 @@ impl Action for SendStream {
         let (data, _metadata) = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
-                e.to_string().report_err(&mut state);
+                e.to_string().report_err(state);
                 self.send_all(network, state.all_user_endpoints(), NetMessage::Stream(None));
                 return Processing::Completed
             }
