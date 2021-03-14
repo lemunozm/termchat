@@ -78,7 +78,7 @@ impl<'a> Application<'a> {
         renderer.render(&self.state, &self.config.theme)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);
-        let (_, server_addr) = self.node.network().listen(Transport::Tcp, server_addr)?;
+        let (_, server_addr) = self.node.network().listen(Transport::FramedTcp, server_addr)?;
         self.node.network().listen(Transport::Udp, self.config.discovery_addr)?;
 
         let (discovery_endpoint, _) =
@@ -131,7 +131,7 @@ impl<'a> Application<'a> {
                 if user != self.config.user_name {
                     let mut try_connect = || -> Result<()> {
                         let (user_endpoint, _) =
-                            self.node.network().connect_sync(Transport::Tcp, server_addr)?;
+                            self.node.network().connect_sync(Transport::FramedTcp, server_addr)?;
                         let message = NetMessage::HelloUser(self.config.user_name.clone());
                         self.node.network().send(user_endpoint, self.encoder.encode(message));
                         self.state.connected_user(user_endpoint, &user);

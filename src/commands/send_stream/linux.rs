@@ -3,8 +3,9 @@ use crate::commands::{Command};
 use crate::state::{State};
 use crate::message::{NetMessage};
 use crate::util::{Result, Reportable};
+use crate::encoder::{Encoder};
 
-use message_io::network::{NetworkController};
+use message_io::network::{NetworkController, Endpoint};
 use resize::px::RGB;
 use rgb::RGB8;
 use v4l::prelude::*;
@@ -34,6 +35,7 @@ pub struct SendStream {
     stream: MmapStream<'static>,
     width: usize,
     height: usize,
+    encoder: Encoder,
 }
 
 impl SendStream {
@@ -47,7 +49,7 @@ impl SendStream {
 
         let stream = MmapStream::with_buffers(&dev, Type::VideoCapture, 4)?;
 
-        Ok(SendStream { stream, width, height })
+        Ok(SendStream { stream, width, height, encoder: Encoder::new() })
     }
 }
 
@@ -56,14 +58,14 @@ impl Action for SendStream {
         if state.stop_stream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
-            network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
+            self.send_all(network, state.all_user_endpoints(), NetMessage::Stream(None));
             return Processing::Completed
         }
         let (data, _metadata) = match self.stream.next() {
             Ok(d) => d,
             Err(e) => {
                 e.to_string().report_err(&mut state);
-                network.send_all(state.all_user_endpoints(), NetMessage::Stream(None));
+                self.send_all(network, state.all_user_endpoints(), NetMessage::Stream(None));
                 return Processing::Completed
             }
         };
@@ -89,9 +91,23 @@ impl Action for SendStream {
         });
 
         let message = NetMessage::Stream(Some((data, self.width, self.height)));
-        network.send_all(state.all_user_endpoints(), message);
+        self.send_all(network, state.all_user_endpoints(), message);
 
         Processing::Partial(Duration::from_millis(16)) //~60fps - delay of computation
+    }
+}
+
+impl SendStream {
+    fn send_all<'a>(
+        &mut self,
+        network: &NetworkController,
+        endpoints: impl Iterator<Item = &'a Endpoint>,
+        net_message: NetMessage,
+    ) {
+        let message = self.encoder.encode(net_message);
+        for endpoint in endpoints {
+            network.send(*endpoint, message);
+        }
     }
 }
 
