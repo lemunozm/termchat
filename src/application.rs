@@ -292,7 +292,7 @@ impl<'a> Application<'a> {
     }
 
     fn process_action(&mut self, mut action: Box<dyn Action>) {
-        match action.process(&mut self.state, &self.node.network()) {
+        match action.process(&mut self.state, self.node.network()) {
             Processing::Completed => (),
             Processing::Partial(delay) => {
                 self.node.signals().send_with_timer(Signal::Action(action), delay);
