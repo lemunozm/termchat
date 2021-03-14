@@ -4,7 +4,7 @@ use crate::state::{State};
 use crate::message::{NetMessage};
 use crate::util::{Result, Reportable};
 
-use message_io::network::{Network};
+use message_io::network::{NetworkController};
 use resize::px::RGB;
 use rgb::RGB8;
 use v4l::prelude::*;
@@ -52,7 +52,7 @@ impl SendStream {
 }
 
 impl Action for SendStream {
-    fn process(&mut self, mut state: &mut State, network: &mut Network) -> Processing {
+    fn process(&mut self, mut state: &mut State, network: &NetworkController) -> Processing {
         if state.stop_stream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
@@ -110,7 +110,7 @@ impl Command for StopStreamCommand {
 }
 struct StopStream {}
 impl Action for StopStream {
-    fn process(&mut self, state: &mut State, _network: &mut Network) -> Processing {
+    fn process(&mut self, state: &mut State, _network: &NetworkController) -> Processing {
         state.stop_stream = true;
         Processing::Completed
     }

@@ -12,11 +12,11 @@ keywords = ["network", "chat", "lan", "terminal", "multicast"]
 categories = ["command-line-utilities", "command-line-interface"]
 
 [badges]
-maintenance = { status = "actively-developed" }
+maintenance = { status = "passively-maintenance" }
 
 [dependencies]
-#message-io = { default-features = false, features = ["udp", "tcp"], version = "0.6.0" }
-message-io = "0.6.0"
+message-io = { default-features = false, features = ["udp", "tcp"], version = "0.14" }
+bincode = "1.3.3"
 serde = { version = "1.0.124", features = ["derive"] }
 #keep the same version as tui for faster compile time
 crossterm = "0.18.2"
