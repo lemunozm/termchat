@@ -1,6 +1,7 @@
 # Changelog
 
-## Current release
+## Release 1.3.0
+- Added configuration file and themes. (by `sigmaSd`)
 - Added terminal bell when messages are received.
 - Added unix style paramters to commands. (by `zhongzc`)
 - Minor internal improvements to reduce CPU.
