@@ -34,12 +34,11 @@ pub fn draw(
             .split(upper_chunk);
         draw_messages_panel(frame, state, upper_chunks[0], theme);
         draw_video_panel(frame, state, upper_chunks[1]);
-        draw_input_panel(frame, state, chunks[1], theme);
     }
     else {
         draw_messages_panel(frame, state, chunks[0], theme);
-        draw_input_panel(frame, state, chunks[1], theme);
     }
+    draw_input_panel(frame, state, chunks[1], theme);
 }
 
 fn draw_messages_panel(
@@ -134,8 +133,8 @@ fn add_progress_bar<'a>(
         ProgressState::Completed => ("Done! ", width, 0),
     };
 
-    let current: String = std::iter::repeat("#").take(ui_current).collect();
-    let remaining: String = std::iter::repeat("-").take(ui_remaining).collect();
+    let current: String = "#".repeat(ui_current);
+    let remaining: String = "-".repeat(ui_remaining);
 
     let msg = format!("[{}{}]", current, remaining);
     let ui_message = vec![
