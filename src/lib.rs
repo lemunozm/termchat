@@ -7,4 +7,5 @@ mod action;
 mod commands;
 mod ui;
 mod util;
+mod encoder;
 pub mod config;

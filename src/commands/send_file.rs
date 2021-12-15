@@ -3,8 +3,9 @@ use crate::commands::{Command};
 use crate::state::{State};
 use crate::message::{NetMessage, Chunk};
 use crate::util::{Result, Reportable};
+use crate::encoder::{Encoder};
 
-use message_io::network::{Network};
+use message_io::network::{NetworkController};
 
 use std::path::{Path};
 use std::io::{Read};
@@ -32,6 +33,7 @@ pub struct SendFile {
     file_name: String,
     file_size: u64,
     progress_id: Option<usize>,
+    encoder: Encoder,
 }
 
 impl SendFile {
@@ -50,12 +52,12 @@ impl SendFile {
         let file_size = std::fs::metadata(file_path)?.len();
         let file = std::fs::File::open(file_path)?;
 
-        Ok(SendFile { file, file_name, file_size, progress_id: None })
+        Ok(SendFile { file, file_name, file_size, progress_id: None, encoder: Encoder::new() })
     }
 }
 
 impl Action for SendFile {
-    fn process(&mut self, state: &mut State, network: &mut Network) -> Processing {
+    fn process(&mut self, state: &mut State, network: &NetworkController) -> Processing {
         if self.progress_id.is_none() {
             let id = state.add_progress_message(&self.file_name, self.file_size);
             self.progress_id = Some(id);
@@ -77,8 +79,11 @@ impl Action for SendFile {
 
         state.progress_message_update(self.progress_id.unwrap(), bytes_read as u64);
 
-        let message = NetMessage::UserData(self.file_name.clone(), chunk);
-        network.send_all(state.all_user_endpoints(), message);
+        let net_message = NetMessage::UserData(self.file_name.clone(), chunk);
+        let message = self.encoder.encode(net_message);
+        for endpoint in state.all_user_endpoints() {
+            network.send(*endpoint, message);
+        }
 
         processing
     }

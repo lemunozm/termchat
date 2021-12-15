@@ -12,16 +12,19 @@ use crate::commands::send_file::{SendFileCommand};
 #[cfg(feature = "stream-video")]
 use crate::commands::send_stream::{SendStreamCommand, StopStreamCommand};
 use crate::config::Config;
+use crate::encoder::{self, Encoder};
 
 use crossterm::event::{Event as TermEvent, KeyCode, KeyEvent, KeyModifiers};
 
-use message_io::events::{EventQueue};
-use message_io::network::{NetEvent, Network, Endpoint, Transport};
+use message_io::events::{EventReceiver};
+use message_io::network::{Endpoint, Transport};
+use message_io::node::{
+    self, StoredNodeEvent as NodeEvent, StoredNetEvent as NetEvent, NodeTask, NodeHandler,
+};
 
 use std::io::{ErrorKind};
 
-pub enum Event {
-    Network(NetEvent<NetMessage>),
+pub enum Signal {
     Terminal(TermEvent),
     Action(Box<dyn Action>),
     // Close event with an optional error in case of failure
@@ -31,29 +34,27 @@ pub enum Event {
 
 pub struct Application<'a> {
     config: &'a Config,
-    state: State,
-    network: Network,
     commands: CommandManager,
+    state: State,
+    node: NodeHandler<Signal>,
+    _task: NodeTask,
     //read_file_ev: ReadFile,
     _terminal_events: TerminalEventCollector,
-    event_queue: EventQueue<Event>,
+    receiver: EventReceiver<NodeEvent<Signal>>,
+    encoder: Encoder,
 }
 
 impl<'a> Application<'a> {
     pub fn new(config: &'a Config) -> Result<Application<'a>> {
-        let mut event_queue = EventQueue::new();
+        let (handler, listener) = node::split();
 
-        let sender = event_queue.sender().clone(); // Collect network events
-        let network = Network::new(move |net_event| match net_event {
-            NetEvent::RemovedEndpoint(_) => sender.send_with_priority(Event::Network(net_event)),
-            _ => sender.send(Event::Network(net_event)),
-        });
-
-        let sender = event_queue.sender().clone(); // Collect terminal events
+        let terminal_handler = handler.clone(); // Collect terminal events
         let _terminal_events = TerminalEventCollector::new(move |term_event| match term_event {
-            Ok(event) => sender.send(Event::Terminal(event)),
-            Err(e) => sender.send(Event::Close(Some(e))),
+            Ok(event) => terminal_handler.signals().send(Signal::Terminal(event)),
+            Err(e) => terminal_handler.signals().send(Signal::Close(Some(e))),
         })?;
+
+        let (_task, receiver) = listener.enqueue();
 
         let commands = CommandManager::default().with(SendFileCommand);
         #[cfg(feature = "stream-video")]
@@ -61,12 +62,14 @@ impl<'a> Application<'a> {
 
         Ok(Application {
             config,
-            state: State::default(),
-            network,
             commands,
+            state: State::default(),
+            node: handler,
+            _task,
             // Stored because we need its internal thread running until the Application was dropped
             _terminal_events,
-            event_queue,
+            receiver,
+            encoder: Encoder::new(),
         })
     }
 
@@ -75,41 +78,45 @@ impl<'a> Application<'a> {
         renderer.render(&self.state, &self.config.theme)?;
 
         let server_addr = ("0.0.0.0", self.config.tcp_server_port);
-        let (_, server_addr) = self.network.listen(Transport::Tcp, server_addr)?;
-        self.network.listen(Transport::Udp, self.config.discovery_addr)?;
+        let (_, server_addr) = self.node.network().listen(Transport::FramedTcp, server_addr)?;
+        self.node.network().listen(Transport::Udp, self.config.discovery_addr)?;
 
-        let discovery_endpoint =
-            self.network.connect(Transport::Udp, self.config.discovery_addr)?;
+        let (discovery_endpoint, _) =
+            self.node.network().connect_sync(Transport::Udp, self.config.discovery_addr)?;
         let message = NetMessage::HelloLan(self.config.user_name.clone(), server_addr.port());
-        self.network.send(discovery_endpoint, message);
+        self.node.network().send(discovery_endpoint, self.encoder.encode(message));
 
         loop {
-            match self.event_queue.receive() {
-                Event::Network(net_event) => match net_event {
-                    NetEvent::Message(endpoint, message) => {
-                        self.process_network_message(endpoint, message);
-                    }
-                    NetEvent::AddedEndpoint(_) => (),
-                    NetEvent::RemovedEndpoint(endpoint) => {
+            match self.receiver.receive() {
+                NodeEvent::Network(net_event) => match net_event {
+                    NetEvent::Connected(_, _) => { /* handler in the connect call*/ }
+                    NetEvent::Message(endpoint, message) => match encoder::decode(&message) {
+                        Some(net_message) => self.process_network_message(endpoint, net_message),
+                        None => return Err("Unknown message received".into()),
+                    },
+                    NetEvent::Accepted(_endpoint, _resource_id) => (),
+                    NetEvent::Disconnected(endpoint) => {
                         self.state.disconnected_user(endpoint);
                         //If the endpoint was sending a stream make sure to close its window
                         self.state.windows.remove(&endpoint);
                         self.righ_the_bell();
                     }
-                    NetEvent::DeserializationError(_) => (),
                 },
-                Event::Terminal(term_event) => {
-                    self.process_terminal_event(term_event);
-                }
-                Event::Action(action) => {
-                    self.process_action(action);
-                }
-                Event::Close(error) => {
-                    return match error {
-                        Some(error) => Err(error),
-                        None => Ok(()),
+                NodeEvent::Signal(signal) => match signal {
+                    Signal::Terminal(term_event) => {
+                        self.process_terminal_event(term_event);
                     }
-                }
+                    Signal::Action(action) => {
+                        self.process_action(action);
+                    }
+                    Signal::Close(error) => {
+                        self.node.stop();
+                        return match error {
+                            Some(error) => Err(error),
+                            None => Ok(()),
+                        }
+                    }
+                },
             }
             renderer.render(&self.state, &self.config.theme)?;
         }
@@ -123,9 +130,10 @@ impl<'a> Application<'a> {
                 let server_addr = (endpoint.addr().ip(), server_port);
                 if user != self.config.user_name {
                     let mut try_connect = || -> Result<()> {
-                        let user_endpoint = self.network.connect(Transport::Tcp, server_addr)?;
+                        let (user_endpoint, _) =
+                            self.node.network().connect_sync(Transport::FramedTcp, server_addr)?;
                         let message = NetMessage::HelloUser(self.config.user_name.clone());
-                        self.network.send(user_endpoint, message);
+                        self.node.network().send(user_endpoint, self.encoder.encode(message));
                         self.state.connected_user(user_endpoint, &user);
                         Ok(())
                     };
@@ -208,11 +216,11 @@ impl<'a> Application<'a> {
             TermEvent::Resize(_, _) => (),
             TermEvent::Key(KeyEvent { code, modifiers }) => match code {
                 KeyCode::Esc => {
-                    self.event_queue.sender().send_with_priority(Event::Close(None));
+                    self.node.signals().send_with_priority(Signal::Close(None));
                 }
                 KeyCode::Char(character) => {
                     if character == 'c' && modifiers.contains(KeyModifiers::CONTROL) {
-                        self.event_queue.sender().send_with_priority(Event::Close(None));
+                        self.node.signals().send_with_priority(Signal::Close(None));
                     }
                     else {
                         self.state.input_write(character);
@@ -228,10 +236,12 @@ impl<'a> Application<'a> {
                                 );
                                 self.state.add_message(message);
 
-                                self.network.send_all(
-                                    self.state.all_user_endpoints(),
-                                    NetMessage::UserMessage(input.clone()),
-                                );
+                                for endpoint in self.state.all_user_endpoints() {
+                                    self.node.network().send(
+                                        *endpoint,
+                                        self.encoder.encode(NetMessage::UserMessage(input.clone())),
+                                    );
+                                }
 
                                 match action {
                                     Some(action) => self.process_action(action),
@@ -282,16 +292,16 @@ impl<'a> Application<'a> {
     }
 
     fn process_action(&mut self, mut action: Box<dyn Action>) {
-        match action.process(&mut self.state, &mut self.network) {
+        match action.process(&mut self.state, self.node.network()) {
             Processing::Completed => (),
             Processing::Partial(delay) => {
-                self.event_queue.sender().send_with_timer(Event::Action(action), delay);
+                self.node.signals().send_with_timer(Signal::Action(action), delay);
             }
         }
     }
 
-    pub fn sender(&mut self) -> message_io::events::EventSender<Event> {
-        self.event_queue.sender().clone()
+    pub fn node_handler(&self) -> NodeHandler<Signal> {
+        self.node.clone()
     }
 
     pub fn righ_the_bell(&self) {

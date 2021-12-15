@@ -1,6 +1,6 @@
 use crate::state::{State};
 
-use message_io::network::{Network};
+use message_io::network::{NetworkController};
 
 use std::time::{Duration};
 
@@ -10,5 +10,5 @@ pub enum Processing {
 }
 
 pub trait Action: Send {
-    fn process(&mut self, state: &mut State, network: &mut Network) -> Processing;
+    fn process(&mut self, state: &mut State, network: &NetworkController) -> Processing;
 }

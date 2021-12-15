@@ -1,8 +1,9 @@
 #![cfg(feature = "ui-test")]
 
-use termchat::application::{Application, Event};
+use termchat::application::{Application, Signal};
 use termchat::config::Config;
-use message_io::events::EventSender;
+
+use message_io::node::{NodeHandler};
 
 #[test]
 fn send_file() {
@@ -30,8 +31,8 @@ fn send_file() {
     std::thread::sleep(std::time::Duration::from_secs(2));
 
     // finish
-    s1.send(Event::Close(None));
-    s2.send(Event::Close(None));
+    s1.signals().send(Signal::Close(None));
+    s2.signals().send(Signal::Close(None));
     t1.join().unwrap();
     t2.join().unwrap();
 
@@ -42,26 +43,29 @@ fn send_file() {
     assert_eq!(data, send_data);
 }
 
-fn test_user(config: Config) -> (EventSender<Event>, std::thread::JoinHandle<()>) {
+fn test_user(config: Config) -> (NodeHandler<Signal>, std::thread::JoinHandle<()>) {
     let (tx, rx) = std::sync::mpsc::channel();
     let t = std::thread::spawn(move || {
         let mut app = Application::new(&config).unwrap();
-        let sender = app.sender();
-        tx.send(sender).unwrap();
+        tx.send(app.node_handler()).unwrap();
         app.run(std::io::sink()).unwrap();
     });
     (rx.recv().unwrap(), t)
 }
 
-fn input(sender: &mut EventSender<Event>, s: &str) {
+fn input(handler: &mut NodeHandler<Signal>, s: &str) {
     for c in s.chars() {
-        sender.send(Event::Terminal(crossterm::event::Event::Key(crossterm::event::KeyEvent {
-            code: crossterm::event::KeyCode::Char(c),
-            modifiers: crossterm::event::KeyModifiers::NONE,
-        })));
+        handler.signals().send(Signal::Terminal(crossterm::event::Event::Key(
+            crossterm::event::KeyEvent {
+                code: crossterm::event::KeyCode::Char(c),
+                modifiers: crossterm::event::KeyModifiers::NONE,
+            },
+        )));
     }
-    sender.send(Event::Terminal(crossterm::event::Event::Key(crossterm::event::KeyEvent {
-        code: crossterm::event::KeyCode::Enter,
-        modifiers: crossterm::event::KeyModifiers::NONE,
-    })));
+    handler.signals().send(Signal::Terminal(crossterm::event::Event::Key(
+        crossterm::event::KeyEvent {
+            code: crossterm::event::KeyCode::Enter,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+        },
+    )));
 }
