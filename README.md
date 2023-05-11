@@ -67,12 +67,14 @@ Termchat treats messages containings the following commands in a special way:
 - **`?send <$path_to_file>`**: sends the specified file to everyone on the network,
   example: `?send ./myfile`
 
-  Note: The received files can be found in `/tmp/termchat/<termchat-username>/<file_name>`
+  Note: The received files can be found in `/tmp/termchat/<termchat-username>/<file_name>` on Linux or Mac,
+  or `%USERPROFILE%\Appdata\Local\Temp\termchat\<termchat-username>\<file-name>` if using Windows.
 
 - **`?startstream`**/**`?stopstream`**: starts/stops video stream and send it to all peers. Currently this is only supported on linux, the other platforms can only receive the video.
 
 ### Config
-Termchat store its configuration in a simple file located at `$ConfigDir/termchat/config`
+Termchat store its configuration in a simple file located at `$ConfigDir/termchat/config` in Mac or Linux,
+or `%USERPROFILE%\AppData\Roaming\termchat\config` if using Windows.
 
 **Default config:**
 ```
