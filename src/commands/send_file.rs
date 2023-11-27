@@ -19,7 +19,7 @@ impl Command for SendFileCommand {
     }
 
     fn parse_params(&self, params: Vec<String>) -> Result<Box<dyn Action>> {
-        let param = params.get(0).ok_or("No file specified")?;
+        let param = params.first().ok_or("No file specified")?;
         let file_path = shellexpand::full(param)?;
         match SendFile::new(&file_path) {
             Ok(action) => Ok(Box::new(action)),

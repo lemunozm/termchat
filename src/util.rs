@@ -8,7 +8,7 @@ pub fn split_each(input: String, width: usize) -> Vec<String> {
 
     for current_char in input.chars() {
         if (index != 0 && index == width) || index + current_char.width().unwrap_or(0) > width {
-            splitted.push(row.drain(..).collect());
+            splitted.push(std::mem::take(&mut row));
             index = 0;
         }
 
@@ -17,7 +17,7 @@ pub fn split_each(input: String, width: usize) -> Vec<String> {
     }
     // leftover
     if !row.is_empty() {
-        splitted.push(row.drain(..).collect());
+        splitted.push(std::mem::take(&mut row));
     }
     splitted
 }
