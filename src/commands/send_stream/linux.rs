@@ -54,7 +54,7 @@ impl SendStream {
 }
 
 impl Action for SendStream {
-    fn process(&mut self, mut state: &mut State, network: &NetworkController) -> Processing {
+    fn process(&mut self, state: &mut State, network: &NetworkController) -> Processing {
         if state.stop_stream {
             // stop stream and restore stop_stream to false for the next stream usage
             state.stop_stream = false;
