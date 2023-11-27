@@ -245,7 +245,8 @@ impl State {
                         let new_current = *current + increment;
                         if new_current == *total {
                             ProgressState::Completed
-                        } else {
+                        }
+                        else {
                             ProgressState::Working(*total, new_current)
                         }
                     }
