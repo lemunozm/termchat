@@ -33,7 +33,7 @@ rgb = {version="0.8.25", features=["serde"]}
 resize = "0.7.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-v4l = { version = "0.12.0", optional = true }
+v4l = { version = "0.14.0", optional = true }
 
 [dev-dependencies]
 rand = "0.8.3"
